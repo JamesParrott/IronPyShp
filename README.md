@@ -6,6 +6,9 @@ correctly with unicode data in Iron Python 2 (in which `str is not bytes`).
 Bonus: Preserves the order of fields in shape files in `Record.as_dict()` by setting `dict = collections.OrderedDict`.
 
 - **Reluctant Iron Python 2 user**: [James Parrott](https://github.com/JamesParrott)
+- **Version**: 2.3.1
+- **Date**: 18 April, 2023
+ - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 # PyShp
 
