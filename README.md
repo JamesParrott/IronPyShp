@@ -1,6 +1,6 @@
 # IronPyShp
 
-Generalises logic based on isinstance(... bytes) (relying on `str is bytes` in CPython 2), to allow PyShp to work 
+Generalises logic based on bytes instance checks (relying on `str is bytes` in CPython 2), to allow PyShp to work 
 correctly with unicode data in Iron Python 2 (in which `str is not bytes`).  
 
 Bonus: Preserves the order of fields in shape files in `Record.as_dict()` by setting `dict = collections.OrderedDict`.
