@@ -5,7 +5,7 @@ correctly with unicode data in Iron Python 2 (in which `str is not bytes`).
 
 Bonus: Preserves the order of fields in shape files in `Record.as_dict()` by setting `dict = collections.OrderedDict`.
 
-- **Reluctant Iron Python 2 user**: james.parrott<at>proton.me
+- **Reluctant Iron Python 2 user**: [James Parrott](https://github.com/JamesParrott)
 
 # PyShp
 
