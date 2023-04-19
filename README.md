@@ -1,8 +1,11 @@
 # IronPyShp
 
-Attempts to patch logic based on isinstance(... bytes), to allow PyShp to work correctly in Iron Python 2
+Generalises logic based on isinstance(... bytes) (relying on `str is bytes` in CPython 2), to allow PyShp to work 
+correctly with unicode data in Iron Python 2 (in which `str is not bytes`).  
 
-https://nedbatchelder.com/blog/201703/ironpython_is_weird.html
+Bonus: Preserves the order of fields in shape files in `Record.as_dict()` by setting `dict = collections.OrderedDict`.
+
+- **Reluctant Iron Python 2 user**: james.parrott<at>proton.me
 
 # PyShp
 
@@ -10,8 +13,6 @@ https://nedbatchelder.com/blog/201703/ironpython_is_weird.html
 The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Python.
 
 ![pyshp logo](http://4.bp.blogspot.com/_SBi37QEsCvg/TPQuOhlHQxI/AAAAAAAAAE0/QjFlWfMx0tQ/S350/GSP_Logo.png "PyShp")
-
-![build status]:DIY.  
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)
