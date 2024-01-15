@@ -504,118 +504,118 @@ class Shape(object):
         else:
             self.__oid = -1
 
-    @property
-    def __geo_interface__(self):
-        if self.shapeType in [POINT, POINTM, POINTZ]:
-            # point
-            if len(self.points) == 0:
-                # the shape has no coordinate information, i.e. is 'empty'
-                # the geojson spec does not define a proper null-geometry type
-                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'Point', 'coordinates':tuple()}
-            else:
-                return {
-                'type': 'Point',
-                'coordinates': tuple(self.points[0])
-                }
-        elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
-            if len(self.points) == 0:
-                # the shape has no coordinate information, i.e. is 'empty'
-                # the geojson spec does not define a proper null-geometry type
-                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'MultiPoint', 'coordinates':[]}
-            else:
-                # multipoint
-                return {
-                'type': 'MultiPoint',
-                'coordinates': [tuple(p) for p in self.points]
-                }
-        elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
-            if len(self.parts) == 0:
-                # the shape has no coordinate information, i.e. is 'empty'
-                # the geojson spec does not define a proper null-geometry type
-                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'LineString', 'coordinates':[]}
-            elif len(self.parts) == 1:
-                # linestring
-                return {
-                'type': 'LineString',
-                'coordinates': [tuple(p) for p in self.points]
-                }
-            else:
-                # multilinestring
-                ps = None
-                coordinates = []
-                for part in self.parts:
-                    if ps == None:
-                        ps = part
-                        continue
-                    else:
-                        coordinates.append([tuple(p) for p in self.points[ps:part]])
-                        ps = part
-                else:
-                    coordinates.append([tuple(p) for p in self.points[part:]])
-                return {
-                'type': 'MultiLineString',
-                'coordinates': coordinates
-                }
-        elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
-            if len(self.parts) == 0:
-                # the shape has no coordinate information, i.e. is 'empty'
-                # the geojson spec does not define a proper null-geometry type
-                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'Polygon', 'coordinates':[]}
-            else:
-                # get all polygon rings
-                rings = []
-                for i in xrange(len(self.parts)):
-                    # get indexes of start and end points of the ring
-                    start = self.parts[i]
-                    try:
-                        end = self.parts[i+1]
-                    except IndexError:
-                        end = len(self.points)
+#     @property
+#     def __geo_interface__(self):
+#         if self.shapeType in [POINT, POINTM, POINTZ]:
+#             # point
+#             if len(self.points) == 0:
+#                 # the shape has no coordinate information, i.e. is 'empty'
+#                 # the geojson spec does not define a proper null-geometry type
+#                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+#                 return {'type':'Point', 'coordinates':tuple()}
+#             else:
+#                 return {
+#                 'type': 'Point',
+#                 'coordinates': tuple(self.points[0])
+#                 }
+#         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
+#             if len(self.points) == 0:
+#                 # the shape has no coordinate information, i.e. is 'empty'
+#                 # the geojson spec does not define a proper null-geometry type
+#                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+#                 return {'type':'MultiPoint', 'coordinates':[]}
+#             else:
+#                 # multipoint
+#                 return {
+#                 'type': 'MultiPoint',
+#                 'coordinates': [tuple(p) for p in self.points]
+#                 }
+#         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
+#             if len(self.parts) == 0:
+#                 # the shape has no coordinate information, i.e. is 'empty'
+#                 # the geojson spec does not define a proper null-geometry type
+#                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+#                 return {'type':'LineString', 'coordinates':[]}
+#             elif len(self.parts) == 1:
+#                 # linestring
+#                 return {
+#                 'type': 'LineString',
+#                 'coordinates': [tuple(p) for p in self.points]
+#                 }
+#             else:
+#                 # multilinestring
+#                 ps = None
+#                 coordinates = []
+#                 for part in self.parts:
+#                     if ps == None:
+#                         ps = part
+#                         continue
+#                     else:
+#                         coordinates.append([tuple(p) for p in self.points[ps:part]])
+#                         ps = part
+#                 else:
+#                     coordinates.append([tuple(p) for p in self.points[part:]])
+#                 return {
+#                 'type': 'MultiLineString',
+#                 'coordinates': coordinates
+#                 }
+#         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
+#             if len(self.parts) == 0:
+#                 # the shape has no coordinate information, i.e. is 'empty'
+#                 # the geojson spec does not define a proper null-geometry type
+#                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+#                 return {'type':'Polygon', 'coordinates':[]}
+#             else:
+#                 # get all polygon rings
+#                 rings = []
+#                 for i in xrange(len(self.parts)):
+#                     # get indexes of start and end points of the ring
+#                     start = self.parts[i]
+#                     try:
+#                         end = self.parts[i+1]
+#                     except IndexError:
+#                         end = len(self.points)
 
-                    # extract the points that make up the ring
-                    ring = [tuple(p) for p in self.points[start:end]]
-                    rings.append(ring)
+#                     # extract the points that make up the ring
+#                     ring = [tuple(p) for p in self.points[start:end]]
+#                     rings.append(ring)
 
-                # organize rings into list of polygons, where each polygon is defined as list of rings.
-                # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
-                polys = organize_polygon_rings(rings, self._errors)
+#                 # organize rings into list of polygons, where each polygon is defined as list of rings.
+#                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
+#                 polys = organize_polygon_rings(rings, self._errors)
                 
-                # if VERBOSE is True, issue detailed warning about any shape errors
-                # encountered during the Shapefile to GeoJSON conversion
-                if VERBOSE and self._errors: 
-                    header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
-                    orphans = self._errors.get('polygon_orphaned_holes', None)
-                    if orphans:
-                        msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
-but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
-orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
-encoded as GeoJSON exterior rings instead of holes.'
-                        logger.warning(msg)
-                    only_holes = self._errors.get('polygon_only_holes', None)
-                    if only_holes:
-                        msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
-but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
-still included but were encoded as GeoJSON exterior rings instead of holes.'
-                        logger.warning(msg)
+#                 # if VERBOSE is True, issue detailed warning about any shape errors
+#                 # encountered during the Shapefile to GeoJSON conversion
+#                 if VERBOSE and self._errors: 
+#                     header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
+#                     orphans = self._errors.get('polygon_orphaned_holes', None)
+#                     if orphans:
+#                         msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
+# but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
+# orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
+# encoded as GeoJSON exterior rings instead of holes.'
+#                         logger.warning(msg)
+#                     only_holes = self._errors.get('polygon_only_holes', None)
+#                     if only_holes:
+#                         msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
+# but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
+# still included but were encoded as GeoJSON exterior rings instead of holes.'
+#                         logger.warning(msg)
 
-                # return as geojson
-                if len(polys) == 1:
-                    return {
-                    'type': 'Polygon',
-                    'coordinates': polys[0]
-                    }
-                else:
-                    return {
-                    'type': 'MultiPolygon',
-                    'coordinates': polys
-                    }
+#                 # return as geojson
+#                 if len(polys) == 1:
+#                     return {
+#                     'type': 'Polygon',
+#                     'coordinates': polys[0]
+#                     }
+#                 else:
+#                     return {
+#                     'type': 'MultiPolygon',
+#                     'coordinates': polys
+#                     }
 
-        else:
-            raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
+#         else:
+#             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
 
     @staticmethod
     def _from_geojson(geoj):
@@ -848,17 +848,17 @@ class _Record(list):
         return default + fnames 
         
 class ShapeRecord(object):
-    """A ShapeRecord object containing a shape along with its attributes.
-    Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
+    """A ShapeRecord object containing a shape along with its attributes.   """
+    #""" Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
     def __init__(self, shape=None, record=None):
         self.shape = shape
         self.record = record
 
-    @property
-    def __geo_interface__(self):
-        return {'type': 'Feature',
-                'properties': self.record.as_dict(date_strings=True),
-                'geometry': None if self.shape.shapeType == NULL else self.shape.__geo_interface__}
+    # @property
+    # def __geo_interface__(self):
+    #     return {'type': 'Feature',
+    #             'properties': self.record.as_dict(date_strings=True),
+    #             'geometry': None if self.shape.shapeType == NULL else self.shape.__geo_interface__}
 
 class Shapes(list):
     """A class to hold a list of Shape objects. Subclasses list to ensure compatibility with
@@ -869,13 +869,13 @@ class Shapes(list):
     def __repr__(self):
         return 'Shapes: {}'.format(list(self))
 
-    @property
-    def __geo_interface__(self):
-        # Note: currently this will fail if any of the shapes are null-geometries
-        # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
-        collection = {'type': 'GeometryCollection',
-                      'geometries': [shape.__geo_interface__ for shape in self]}
-        return collection
+    # @property
+    # def __geo_interface__(self):
+    #     # Note: currently this will fail if any of the shapes are null-geometries
+    #     # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
+    #     collection = {'type': 'GeometryCollection',
+    #                   'geometries': [shape.__geo_interface__ for shape in self]}
+    #     return collection
 
 class ShapeRecords(list):
     """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
@@ -886,11 +886,11 @@ class ShapeRecords(list):
     def __repr__(self):
         return 'ShapeRecords: {}'.format(list(self))
 
-    @property
-    def __geo_interface__(self):
-        collection =  {'type': 'FeatureCollection',
-                        'features': [shaperec.__geo_interface__ for shaperec in self]}
-        return collection
+    # @property
+    # def __geo_interface__(self):
+    #     collection =  {'type': 'FeatureCollection',
+    #                     'features': [shaperec.__geo_interface__ for shaperec in self]}
+    #     return collection
 
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
@@ -1192,12 +1192,12 @@ class Reader(object):
         for shaperec in self.iterShapeRecords():
             yield shaperec
 
-    @property
-    def __geo_interface__(self):
-        shaperecords = self.shapeRecords()
-        fcollection = shaperecords.__geo_interface__
-        fcollection['bbox'] = list(self.bbox)
-        return fcollection
+    # @property
+    # def __geo_interface__(self):
+    #     shaperecords = self.shapeRecords()
+    #     fcollection = shaperecords.__geo_interface__
+    #     fcollection['bbox'] = list(self.bbox)
+    #     return fcollection
 
     @property
     def shapeTypeName(self):
@@ -2123,13 +2123,13 @@ class Writer(object):
             self.balance()
         # Check is shape or import from geojson
         if not isinstance(s, Shape):
-            if hasattr(s, "__geo_interface__"):
-                s = s.__geo_interface__
+            # if hasattr(s, "__geo_interface__"):
+            #     s = s.__geo_interface__
             if isinstance(s, dict):
                 s = Shape._from_geojson(s)
             else:
                 raise Exception("Can only write Shape objects, GeoJSON dictionaries, "
-                                "or objects with the __geo_interface__, "
+                                # "or objects with the __geo_interface__, "
                                 "not: %r" % s)
         # Write to file
         offset,length = self.__shpRecord(s)
