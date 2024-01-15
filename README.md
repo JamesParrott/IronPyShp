@@ -399,13 +399,7 @@ and the bounding box area the shapefile covers:
 	>>> sf.bbox
 	[-122.515048, 37.652916, -122.327622, 37.863433]
 	
-Finally, if you would prefer to work with the entire shapefile in a different
-format, you can convert all of it to a GeoJSON dictionary, although you may lose
-some information in the process, such as z- and m-values: 
 
-
-	>>> sf.__geo_interface__['type']
-	'FeatureCollection'
 
 ### Reading Geometry
 
@@ -507,29 +501,8 @@ shapeType Point do not have a bounding box 'bbox'.
 		>>> ['%.3f' % coord for coord in shape]
 		['-122.471', '37.787']
 
-In most cases, however, if you need to do more than just type or bounds checking, you may want 
-to convert the geometry to the more human-readable [GeoJSON format](http://geojson.org),
-where lines and polygons are grouped for you:
 
 
-	>>> s = sf.shape(0)
-	>>> geoj = s.__geo_interface__
-	>>> geoj["type"]
-	'MultiPolygon'
-	
-The results from the shapes() method similarly supports converting to GeoJSON:
-
-
-	>>> shapes.__geo_interface__['type']
-	'GeometryCollection'
-
-Note: In some cases, if the conversion from shapefile geometry to GeoJSON encountered any problems
-or potential issues, a warning message will be displayed with information about the affected
-geometry. To ignore or suppress these warnings, you can disable this behavior by setting the 
-module constant VERBOSE to False: 
-
-
-	>>> shapefile.VERBOSE = False
 	
 
 ### Reading Records
@@ -660,12 +633,6 @@ Let's read the blockgroup key and the population for the 4th blockgroup:
 	>>> shapeRecs[3].record[1:3]
 	['060750601001', 4715]
 
-The results from the shapeRecords() method is a list-like object that can be easily converted
-to GeoJSON through the _\_geo_interface\_\_:
-
-
-	>>> shapeRecs.__geo_interface__['type']
-	'FeatureCollection'
 
 The shapeRecord() method reads a single shape/record pair at the specified index.
 To get the 4th shape record from the blockgroups shapefile use the third index:
@@ -675,11 +642,7 @@ To get the 4th shape record from the blockgroups shapefile use the third index:
 	>>> shapeRec.record[1:3]
 	['060750601001', 4715]
 	
-Each individual shape record also supports the _\_geo_interface\_\_ to convert it to a GeoJSON feature:
 
-
-	>>> shapeRec.__geo_interface__['type']
-	'Feature'
 	
 
 ## Writing Shapefiles
@@ -1022,11 +985,6 @@ This can be particularly useful for copying from one file to another:
 	>>> for shaperec in r.iterShapeRecords():
 	...     w.record(*shaperec.record)
 	...     w.shape(shaperec.shape)
-	
-	>>> # or GeoJSON dicts
-	>>> for shaperec in r.iterShapeRecords():
-	...     w.record(*shaperec.record)
-	...     w.shape(shaperec.shape.__geo_interface__)
 	
 	>>> w.close()	
 	
