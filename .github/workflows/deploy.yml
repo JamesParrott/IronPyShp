@@ -9,7 +9,7 @@
 name: deploy
 
 on:
-  workflow-dispatch:
+  workflow_dispatch:
     branches: [ PyShp ]
   # release:
   #   types: [published]

@@ -4,10 +4,12 @@
 name: build
 
 on:
-  push:
+  workflow_dispatch:
     branches: [ PyShp ]
-  pull_request:
-    branches: [ PyShp ]
+  # push:
+  #   branches: [ PyShp ]
+  # pull_request:
+  #   branches: [ PyShp ]
 
 jobs:
   build:
