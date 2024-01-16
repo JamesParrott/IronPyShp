@@ -5,9 +5,9 @@ name: build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ PyShp-fix-CI ]
   pull_request:
-    branches: [ main ]
+    branches: [ PyShp-fix-CI ]
 
 jobs:
   build:
