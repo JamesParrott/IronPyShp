@@ -11,8 +11,8 @@ name: deploy
 on:
   workflow_dispatch :
     branches: [ main ]
-  # release:
-  #   types: [published]
+  release:
+    types: [published]
 
 jobs:
   deploy:
