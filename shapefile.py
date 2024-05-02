@@ -2558,9 +2558,10 @@ https://github.com/martinfleis/geopandas/blob/4a2bfbbc4781dba21e7da29b538149cd68
 """
 
 
-def _read_pyshp(filename, encoding="ISO-8859-1", encoding_errors="strict"):
+def read_shp_into_geopandas_DF(filename, encoding="ISO-8859-1", encoding_errors="strict"):
     """Shapefile to Geopandas GeoDataframe converter"""
-    import shapefile
+    
+    # TODO: Give a more helpful error, if these imports fail.   
     from geopandas import GeoDataFrame
     import pyproj
 
@@ -2571,17 +2572,18 @@ def _read_pyshp(filename, encoding="ISO-8859-1", encoding_errors="strict"):
         pass
 
     try:
-        shp = shapefile.Reader(
+        shp = Reader(
             filename, encoding=encoding, encodingErrors=encoding_errors
         )
         records = shp.shapeRecords()
     except UnicodeDecodeError:
+        # TODO: Print a more helpful message if this import fails.
         import chardet
 
         # guess encoding
         with open(filename[:-3] + "dbf", "rb") as dbf:
             encoding = chardet.detect(dbf.read())["encoding"]
-        shp = shapefile.Reader(filename, encoding=encoding, encodingErrors="replace")
+        shp = Reader(filename, encoding=encoding, encodingErrors="replace")
         records = shp.shapeRecords()
 
     # fetch CRS
@@ -2595,7 +2597,7 @@ def _read_pyshp(filename, encoding="ISO-8859-1", encoding_errors="strict"):
     return GeoDataFrame.from_features(records.__geo_interface__, crs=crs)
 
 
-def _write_pyshp(
+def write_Geopandas_DF_to_shp(
     df, filename, index=False, encoding="ISO-8859-1", encoding_errors="strict"
 ):
     """
@@ -2630,7 +2632,7 @@ def _write_pyshp(
     if index:
         data = data.reset_index()
 
-    with shapefile.Writer(
+    with Writer(
         filename, encoding=encoding, encodingErrors=encoding_errors
     ) as w:
         for name, dtype in data.dtypes.iteritems():
