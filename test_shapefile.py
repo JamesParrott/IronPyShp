@@ -278,7 +278,8 @@ def test_reader_url():
             pass
 
     # test reading zipfile from url
-    url = "https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip"
+    # url = "https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip"
+    url = "http://download.geofabrik.de/antarctica-latest-free.shp.zip"
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
             pass
