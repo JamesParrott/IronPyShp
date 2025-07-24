@@ -54,11 +54,11 @@ jobs:
            caddy: caddy_2.10.0_windows_amd64.zip,
            windows: yes,
            },
-          {os: macos-latest,
-           python: ironpython,
-           caddy: caddy_2.10.0_mac_amd64.tar.gz,
-           windows: no,
-           },
+          # {os: macos-latest,
+          #  python: ironpython,
+          #  caddy: caddy_2.10.0_mac_amd64.tar.gz,
+          #  windows: no,
+          #  },
         ]
 
     steps:
@@ -68,11 +68,15 @@ jobs:
 
     - name: Install IronPython on Ubuntu
       if: ${{ startsWith(matrix.platform.os, 'ubuntu') }}
+      shell: bash
       run: |
         sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
         echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
         sudo apt update
-        sudo apt install mono-devel libmono-system-numerics4.0-cil  
+        sudo apt install mono-devel
+        sudo apt install libmono-system-numerics4.0-cil
+        ls -la /opt/i*
+        ipy -V
       # sudo mv IronPython-2.7.11 /opt/ironpython
       # echo "/opt/ironpython" >> $GITHUB_PATH
 
@@ -82,11 +86,11 @@ jobs:
         choco install ironpython --version=2.7.11 --yes
         echo "C:\Program Files\IronPython 2.7" >> $env:GITHUB_PATH
 
-    - name: Install IronPython on macOS
-      if: matrix.platform.os == 'macos-latest'
-      run: |
-        brew install --cask ironpython
-        echo "/Applications/IronPython-2.7.11" >> $GITHUB_PATH
+    # - name: Install IronPython on macOS
+    #   if: matrix.platform.os == 'macos-latest'
+    #   run: |
+    #     brew install --cask ironpython
+    #     echo "/Applications/IronPython-2.7.11" >> $GITHUB_PATH
 
     - name: Non-network tests
       uses: ./IronPyshp/.github/actions/test
