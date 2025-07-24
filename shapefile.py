@@ -189,7 +189,7 @@ else:
 
     def is_string(v):
         return isinstance(v, basestring)
-# Save reference to possibly unordered dict, to 
+# Save reference to possibly unordered dict, to
 # instead of dict for isinstance({}, dict) calls
 # after we possibly patch dict = collections.OrderedDict
 _dict = dict
