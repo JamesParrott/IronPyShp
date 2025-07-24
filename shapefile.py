@@ -2910,9 +2910,8 @@ def _test(args = sys.argv[1:], verbosity = False):
     if verbosity == 0:
         print("Getting doctests...")
 
-    import re
-
     import doctest
+    import re
 
     doctest.NORMALIZE_WHITESPACE = 1
 
