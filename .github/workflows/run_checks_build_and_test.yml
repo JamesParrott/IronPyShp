@@ -75,8 +75,8 @@ jobs:
         sudo apt update
         sudo apt install mono-devel
         sudo apt install libmono-system-numerics4.0-cil
-        ls -la /opt/i*
         ipy -V
+        where ipy
       # sudo mv IronPython-2.7.11 /opt/ironpython
       # echo "/opt/ironpython" >> $GITHUB_PATH
 
