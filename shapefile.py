@@ -11,7 +11,7 @@ and Iron Python 2.7 (IronPyShp fixes a unicode bug, but
 has not otherwise been tested).
 """
 
-__version__ = "2.3.1"
+__version__ = "2.3.2"
 
 import array
 import collections
