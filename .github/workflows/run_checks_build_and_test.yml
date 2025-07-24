@@ -39,7 +39,7 @@ jobs:
 
 
   test_on_IronPython_2_7:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -70,13 +70,13 @@ jobs:
         echo "/opt/ironpython" >> $GITHUB_PATH
 
     - name: Install IronPython on Windows
-      if: matrix.os == 'windows-latest'
+      if: matrix.platform.os == 'windows-latest'
       run: |
         choco install ironpython --version=2.7.11 --yes
         echo "C:\Program Files\IronPython 2.7" >> $env:GITHUB_PATH
 
     - name: Install IronPython on macOS
-      if: matrix.os == 'macos-latest'
+      if: matrix.platform.os == 'macos-latest'
       run: |
         brew install --cask ironpython
         echo "/Applications/IronPython-2.7.11" >> $GITHUB_PATH
