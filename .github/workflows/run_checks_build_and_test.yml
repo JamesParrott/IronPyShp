@@ -41,11 +41,14 @@ jobs:
   test_on_IronPython_2_7:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      with:
+        path: ./IronPyshp
 
     - name: Install IronPython on Ubuntu
       if: matrix.os == 'ubuntu-latest'
