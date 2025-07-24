@@ -62,12 +62,13 @@ jobs:
 
     - name: Install IronPython on Ubuntu
       if: ${{ startsWith(matrix.platform.os, 'ubuntu') }}
-      run: |
+      run: 
         sudo apt-get update
-        curl -L -o ironpython.tar.gz https://github.com/IronLanguages/ironpython2/releases/download/ipy-2.7.11/IronPython-2.7.11.tar.gz
-        tar -xzf ironpython.tar.gz
-        sudo mv IronPython-2.7.11 /opt/ironpython
-        echo "/opt/ironpython" >> $GITHUB_PATH
+        sudo apt-get install ironpython -y 
+      # curl -L -o ironpython.tar.gz https://github.com/IronLanguages/ironpython2/releases/download/ipy-2.7.11/IronPython-2.7.11.tar.gz
+      # tar -xzf ironpython.tar.gz
+      # sudo mv IronPython-2.7.11 /opt/ironpython
+      # echo "/opt/ironpython" >> $GITHUB_PATH
 
     - name: Install IronPython on Windows
       if: matrix.platform.os == 'windows-latest'
