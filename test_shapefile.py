@@ -1,13 +1,11 @@
 """
 This module tests the functionality of shapefile.py.
 """
-
-import datetime
-import json
-
 # std lib imports
 import os.path
 import sys
+import json
+import datetime
 
 if sys.version_info.major == 3:
     from pathlib import Path
@@ -15,7 +13,6 @@ if sys.version_info.major == 3:
 
 # third party imports
 import pytest
-
 if sys.version_info.major == 2:
     # required by pytest for python <36
     from pathlib2 import Path
@@ -24,419 +21,186 @@ if sys.version_info.major == 2:
 # our imports
 import shapefile
 
-# define various test shape tuples of (type, points, parts indexes, and expected geo interface output)
-geo_interface_tests = [
-    (
-        shapefile.POINT,  # point
-        [(1, 1)],
-        [],
-        {"type": "Point", "coordinates": (1, 1)},
-    ),
-    (
-        shapefile.MULTIPOINT,  # multipoint
-        [(1, 1), (2, 1), (2, 2)],
-        [],
-        {"type": "MultiPoint", "coordinates": [(1, 1), (2, 1), (2, 2)]},
-    ),
-    (
-        shapefile.POLYLINE,  # single linestring
-        [(1, 1), (2, 1)],
-        [0],
-        {"type": "LineString", "coordinates": [(1, 1), (2, 1)]},
-    ),
-    (
-        shapefile.POLYLINE,  # multi linestring
-        [
-            (1, 1),
-            (2, 1),  # line 1
-            (10, 10),
-            (20, 10),
-        ],  # line 2
-        [0, 2],
-        {
-            "type": "MultiLineString",
-            "coordinates": [
-                [(1, 1), (2, 1)],  # line 1
-                [(10, 10), (20, 10)],  # line 2
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # single polygon, no holes
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior
-        ],
-        [0],
-        {
-            "type": "Polygon",
-            "coordinates": [
-                [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # single polygon, holes (ordered)
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior
-            (2, 2),
-            (4, 2),
-            (4, 4),
-            (2, 4),
-            (2, 2),  # hole 1
-            (5, 5),
-            (7, 5),
-            (7, 7),
-            (5, 7),
-            (5, 5),  # hole 2
-        ],
-        [0, 5, 5 + 5],
-        {
-            "type": "Polygon",
-            "coordinates": [
-                [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],  # exterior
-                [(2, 2), (4, 2), (4, 4), (2, 4), (2, 2)],  # hole 1
-                [(5, 5), (7, 5), (7, 7), (5, 7), (5, 5)],  # hole 2
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # single polygon, holes (unordered)
-        [
-            (2, 2),
-            (4, 2),
-            (4, 4),
-            (2, 4),
-            (2, 2),  # hole 1
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior
-            (5, 5),
-            (7, 5),
-            (7, 7),
-            (5, 7),
-            (5, 5),  # hole 2
-        ],
-        [0, 5, 5 + 5],
-        {
-            "type": "Polygon",
-            "coordinates": [
-                [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],  # exterior
-                [(2, 2), (4, 2), (4, 4), (2, 4), (2, 2)],  # hole 1
-                [(5, 5), (7, 5), (7, 7), (5, 7), (5, 5)],  # hole 2
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # multi polygon, no holes
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior
-            (11, 11),
-            (11, 19),
-            (19, 19),
-            (19, 11),
-            (11, 11),  # exterior
-        ],
-        [0, 5],
-        {
-            "type": "MultiPolygon",
-            "coordinates": [
-                [  # poly 1
-                    [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],
-                ],
-                [  # poly 2
-                    [(11, 11), (11, 19), (19, 19), (19, 11), (11, 11)],
-                ],
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # multi polygon, holes (unordered)
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior 1
-            (11, 11),
-            (11, 19),
-            (19, 19),
-            (19, 11),
-            (11, 11),  # exterior 2
-            (12, 12),
-            (14, 12),
-            (14, 14),
-            (12, 14),
-            (12, 12),  # hole 2.1
-            (15, 15),
-            (17, 15),
-            (17, 17),
-            (15, 17),
-            (15, 15),  # hole 2.2
-            (2, 2),
-            (4, 2),
-            (4, 4),
-            (2, 4),
-            (2, 2),  # hole 1.1
-            (5, 5),
-            (7, 5),
-            (7, 7),
-            (5, 7),
-            (5, 5),  # hole 1.2
-        ],
-        [0, 5, 10, 15, 20, 25],
-        {
-            "type": "MultiPolygon",
-            "coordinates": [
-                [  # poly 1
-                    [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],  # exterior
-                    [(2, 2), (4, 2), (4, 4), (2, 4), (2, 2)],  # hole 1
-                    [(5, 5), (7, 5), (7, 7), (5, 7), (5, 5)],  # hole 2
-                ],
-                [  # poly 2
-                    [(11, 11), (11, 19), (19, 19), (19, 11), (11, 11)],  # exterior
-                    [(12, 12), (14, 12), (14, 14), (12, 14), (12, 12)],  # hole 1
-                    [(15, 15), (17, 15), (17, 17), (15, 17), (15, 15)],  # hole 2
-                ],
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # multi polygon, nested exteriors with holes (unordered)
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior 1
-            (3, 3),
-            (3, 7),
-            (7, 7),
-            (7, 3),
-            (3, 3),  # exterior 2
-            (4.5, 4.5),
-            (4.5, 5.5),
-            (5.5, 5.5),
-            (5.5, 4.5),
-            (4.5, 4.5),  # exterior 3
-            (4, 4),
-            (6, 4),
-            (6, 6),
-            (4, 6),
-            (4, 4),  # hole 2.1
-            (2, 2),
-            (8, 2),
-            (8, 8),
-            (2, 8),
-            (2, 2),  # hole 1.1
-        ],
-        [0, 5, 10, 15, 20],
-        {
-            "type": "MultiPolygon",
-            "coordinates": [
-                [  # poly 1
-                    [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],  # exterior 1
-                    [(2, 2), (8, 2), (8, 8), (2, 8), (2, 2)],  # hole 1.1
-                ],
-                [  # poly 2
-                    [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)],  # exterior 2
-                    [(4, 4), (6, 4), (6, 6), (4, 6), (4, 4)],  # hole 2.1
-                ],
-                [  # poly 3
-                    [
-                        (4.5, 4.5),
-                        (4.5, 5.5),
-                        (5.5, 5.5),
-                        (5.5, 4.5),
-                        (4.5, 4.5),
-                    ],  # exterior 3
-                ],
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # multi polygon, nested exteriors with holes (unordered and tricky holes designed to throw off ring_sample() test)
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior 1
-            (3, 3),
-            (3, 7),
-            (7, 7),
-            (7, 3),
-            (3, 3),  # exterior 2
-            (4.5, 4.5),
-            (4.5, 5.5),
-            (5.5, 5.5),
-            (5.5, 4.5),
-            (4.5, 4.5),  # exterior 3
-            (4, 4),
-            (4, 4),
-            (6, 4),
-            (6, 4),
-            (6, 4),
-            (6, 6),
-            (4, 6),
-            (4, 4),  # hole 2.1 (hole has duplicate coords)
-            (2, 2),
-            (3, 3),
-            (4, 2),
-            (8, 2),
-            (8, 8),
-            (4, 8),
-            (2, 8),
-            (2, 4),
-            (
-                2,
-                2,
-            ),  # hole 1.1 (hole coords form straight line and starts in concave orientation)
-        ],
-        [0, 5, 10, 15, 20 + 3],
-        {
-            "type": "MultiPolygon",
-            "coordinates": [
-                [  # poly 1
-                    [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],  # exterior 1
-                    [
-                        (2, 2),
-                        (3, 3),
-                        (4, 2),
-                        (8, 2),
-                        (8, 8),
-                        (4, 8),
-                        (2, 8),
-                        (2, 4),
-                        (2, 2),
-                    ],  # hole 1.1
-                ],
-                [  # poly 2
-                    [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)],  # exterior 2
-                    [
-                        (4, 4),
-                        (4, 4),
-                        (6, 4),
-                        (6, 4),
-                        (6, 4),
-                        (6, 6),
-                        (4, 6),
-                        (4, 4),
-                    ],  # hole 2.1
-                ],
-                [  # poly 3
-                    [
-                        (4.5, 4.5),
-                        (4.5, 5.5),
-                        (5.5, 5.5),
-                        (5.5, 4.5),
-                        (4.5, 4.5),
-                    ],  # exterior 3
-                ],
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # multi polygon, holes incl orphaned holes (unordered), should raise warning
-        [
-            (1, 1),
-            (1, 9),
-            (9, 9),
-            (9, 1),
-            (1, 1),  # exterior 1
-            (11, 11),
-            (11, 19),
-            (19, 19),
-            (19, 11),
-            (11, 11),  # exterior 2
-            (12, 12),
-            (14, 12),
-            (14, 14),
-            (12, 14),
-            (12, 12),  # hole 2.1
-            (15, 15),
-            (17, 15),
-            (17, 17),
-            (15, 17),
-            (15, 15),  # hole 2.2
-            (95, 95),
-            (97, 95),
-            (97, 97),
-            (95, 97),
-            (95, 95),  # hole x.1 (orphaned hole, should be interpreted as exterior)
-            (2, 2),
-            (4, 2),
-            (4, 4),
-            (2, 4),
-            (2, 2),  # hole 1.1
-            (5, 5),
-            (7, 5),
-            (7, 7),
-            (5, 7),
-            (5, 5),  # hole 1.2
-        ],
-        [0, 5, 10, 15, 20, 25, 30],
-        {
-            "type": "MultiPolygon",
-            "coordinates": [
-                [  # poly 1
-                    [(1, 1), (1, 9), (9, 9), (9, 1), (1, 1)],  # exterior
-                    [(2, 2), (4, 2), (4, 4), (2, 4), (2, 2)],  # hole 1
-                    [(5, 5), (7, 5), (7, 7), (5, 7), (5, 5)],  # hole 2
-                ],
-                [  # poly 2
-                    [(11, 11), (11, 19), (19, 19), (19, 11), (11, 11)],  # exterior
-                    [(12, 12), (14, 12), (14, 14), (12, 14), (12, 12)],  # hole 1
-                    [(15, 15), (17, 15), (17, 17), (15, 17), (15, 15)],  # hole 2
-                ],
-                [  # poly 3 (orphaned hole)
-                    [(95, 95), (97, 95), (97, 97), (95, 97), (95, 95)],  # exterior
-                ],
-            ],
-        },
-    ),
-    (
-        shapefile.POLYGON,  # multi polygon, exteriors with wrong orientation (be nice and interpret as such), should raise warning
-        [
-            (1, 1),
-            (9, 1),
-            (9, 9),
-            (1, 9),
-            (1, 1),  # exterior with hole-orientation
-            (11, 11),
-            (19, 11),
-            (19, 19),
-            (11, 19),
-            (11, 11),  # exterior with hole-orientation
-        ],
-        [0, 5],
-        {
-            "type": "MultiPolygon",
-            "coordinates": [
-                [  # poly 1
-                    [(1, 1), (9, 1), (9, 9), (1, 9), (1, 1)],
-                ],
-                [  # poly 2
-                    [(11, 11), (19, 11), (19, 19), (11, 19), (11, 11)],
-                ],
-            ],
-        },
-    ),
-]
 
+# define various test shape tuples of (type, points, parts indexes, and expected geo interface output)
+geo_interface_tests = [ (shapefile.POINT, # point
+                            [(1,1)],
+                            [],
+                            {'type':'Point','coordinates':(1,1)}
+                        ),
+                       (shapefile.MULTIPOINT, # multipoint
+                            [(1,1),(2,1),(2,2)],
+                            [],
+                            {'type':'MultiPoint','coordinates':[(1,1),(2,1),(2,2)]}
+                        ),
+                       (shapefile.POLYLINE, # single linestring
+                            [(1,1),(2,1)],
+                            [0],
+                            {'type':'LineString','coordinates':[(1,1),(2,1)]}
+                        ),
+                       (shapefile.POLYLINE, # multi linestring
+                            [(1,1),(2,1), # line 1
+                             (10,10),(20,10)], # line 2
+                            [0,2],
+                            {'type':'MultiLineString','coordinates':[
+                                [(1,1),(2,1)], # line 1
+                                [(10,10),(20,10)] # line 2
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # single polygon, no holes
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior
+                             ],
+                            [0],
+                            {'type':'Polygon','coordinates':[
+                                [(1,1),(1,9),(9,9),(9,1),(1,1)],
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # single polygon, holes (ordered)
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior
+                             (2,2),(4,2),(4,4),(2,4),(2,2), # hole 1
+                             (5,5),(7,5),(7,7),(5,7),(5,5), # hole 2
+                             ],
+                            [0,5,5+5],
+                            {'type':'Polygon','coordinates':[
+                                [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # single polygon, holes (unordered)
+                            [
+                             (2,2),(4,2),(4,4),(2,4),(2,2), # hole 1
+                             (1,1),(1,9),(9,9),(9,1),(1,1), # exterior
+                             (5,5),(7,5),(7,7),(5,7),(5,5), # hole 2
+                             ],
+                            [0,5,5+5],
+                            {'type':'Polygon','coordinates':[
+                                [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # multi polygon, no holes
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior
+                             (11,11),(11,19),(19,19),(19,11),(11,11), # exterior
+                             ],
+                            [0,5],
+                            {'type':'MultiPolygon','coordinates':[
+                                [ # poly 1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)],
+                                ],
+                                [ # poly 2
+                                    [(11,11),(11,19),(19,19),(19,11),(11,11)],
+                                ],
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # multi polygon, holes (unordered)
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior 1
+                             (11,11),(11,19),(19,19),(19,11),(11,11), # exterior 2
+                             (12,12),(14,12),(14,14),(12,14),(12,12), # hole 2.1
+                             (15,15),(17,15),(17,17),(15,17),(15,15), # hole 2.2
+                             (2,2),(4,2),(4,4),(2,4),(2,2), # hole 1.1
+                             (5,5),(7,5),(7,7),(5,7),(5,5), # hole 1.2
+                             ],
+                            [0,5,10,15,20,25],
+                            {'type':'MultiPolygon','coordinates':[
+                                [ # poly 1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                    [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                    [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
+                                ],
+                                [ # poly 2
+                                    [(11,11),(11,19),(19,19),(19,11),(11,11)], # exterior
+                                    [(12,12),(14,12),(14,14),(12,14),(12,12)], # hole 1
+                                    [(15,15),(17,15),(17,17),(15,17),(15,15)], # hole 2
+                                ],
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # multi polygon, nested exteriors with holes (unordered)
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior 1
+                             (3,3),(3,7),(7,7),(7,3),(3,3), # exterior 2
+                             (4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5), # exterior 3
+                             (4,4),(6,4),(6,6),(4,6),(4,4), # hole 2.1
+                             (2,2),(8,2),(8,8),(2,8),(2,2), # hole 1.1
+                             ],
+                            [0,5,10,15,20],
+                            {'type':'MultiPolygon','coordinates':[
+                                [ # poly 1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior 1
+                                    [(2,2),(8,2),(8,8),(2,8),(2,2)], # hole 1.1
+                                ],
+                                [ # poly 2
+                                    [(3,3),(3,7),(7,7),(7,3),(3,3)], # exterior 2
+                                    [(4,4),(6,4),(6,6),(4,6),(4,4)], # hole 2.1
+                                ],
+                                [ # poly 3
+                                    [(4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5)], # exterior 3
+                                ],
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # multi polygon, nested exteriors with holes (unordered and tricky holes designed to throw off ring_sample() test)
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior 1
+                             (3,3),(3,7),(7,7),(7,3),(3,3), # exterior 2
+                             (4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5), # exterior 3
+                             (4,4),(4,4),(6,4),(6,4),(6,4),(6,6),(4,6),(4,4), # hole 2.1 (hole has duplicate coords)
+                             (2,2),(3,3),(4,2),(8,2),(8,8),(4,8),(2,8),(2,4),(2,2), # hole 1.1 (hole coords form straight line and starts in concave orientation)
+                             ],
+                            [0,5,10,15,20+3],
+                            {'type':'MultiPolygon','coordinates':[
+                                [ # poly 1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior 1
+                                    [(2,2),(3,3),(4,2),(8,2),(8,8),(4,8),(2,8),(2,4),(2,2)], # hole 1.1
+                                ],
+                                [ # poly 2
+                                    [(3,3),(3,7),(7,7),(7,3),(3,3)], # exterior 2
+                                    [(4,4),(4,4),(6,4),(6,4),(6,4),(6,6),(4,6),(4,4)], # hole 2.1
+                                ],
+                                [ # poly 3
+                                    [(4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5)], # exterior 3
+                                ],
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # multi polygon, holes incl orphaned holes (unordered), should raise warning
+                            [(1,1),(1,9),(9,9),(9,1),(1,1), # exterior 1
+                             (11,11),(11,19),(19,19),(19,11),(11,11), # exterior 2
+                             (12,12),(14,12),(14,14),(12,14),(12,12), # hole 2.1
+                             (15,15),(17,15),(17,17),(15,17),(15,15), # hole 2.2
+                             (95,95),(97,95),(97,97),(95,97),(95,95), # hole x.1 (orphaned hole, should be interpreted as exterior)
+                             (2,2),(4,2),(4,4),(2,4),(2,2), # hole 1.1
+                             (5,5),(7,5),(7,7),(5,7),(5,5), # hole 1.2
+                             ],
+                            [0,5,10,15,20,25,30],
+                            {'type':'MultiPolygon','coordinates':[
+                                [ # poly 1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                    [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                    [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
+                                ],
+                                [ # poly 2
+                                    [(11,11),(11,19),(19,19),(19,11),(11,11)], # exterior
+                                    [(12,12),(14,12),(14,14),(12,14),(12,12)], # hole 1
+                                    [(15,15),(17,15),(17,17),(15,17),(15,15)], # hole 2
+                                ],
+                                [ # poly 3 (orphaned hole)
+                                    [(95,95),(97,95),(97,97),(95,97),(95,95)], # exterior
+                                ],
+                                ]}
+                        ),
+                       (shapefile.POLYGON, # multi polygon, exteriors with wrong orientation (be nice and interpret as such), should raise warning
+                            [(1,1),(9,1),(9,9),(1,9),(1,1), # exterior with hole-orientation
+                             (11,11),(19,11),(19,19),(11,19),(11,11), # exterior with hole-orientation
+                             ],
+                            [0,5],
+                            {'type':'MultiPolygon','coordinates':[
+                                [ # poly 1
+                                    [(1,1),(9,1),(9,9),(1,9),(1,1)],
+                                ],
+                                [ # poly 2
+                                    [(11,11),(19,11),(19,19),(11,19),(11,11)],
+                                ],
+                                ]}
+                        ),
+                     ]
 
 def test_empty_shape_geo_interface():
     """
@@ -447,7 +211,6 @@ def test_empty_shape_geo_interface():
     shape = shapefile.Shape()
     with pytest.raises(Exception):
         shape.__geo_interface__
-
 
 @pytest.mark.parametrize("typ,points,parts,expected", geo_interface_tests)
 def test_expected_shape_geo_interface(typ, points, parts, expected):
@@ -463,22 +226,22 @@ def test_expected_shape_geo_interface(typ, points, parts, expected):
 def test_reader_geo_interface():
     with shapefile.Reader("shapefiles/blockgroups") as r:
         geoj = r.__geo_interface__
-        assert geoj["type"] == "FeatureCollection"
-        assert "bbox" in geoj
+        assert geoj['type'] == 'FeatureCollection'
+        assert 'bbox' in geoj
         assert json.dumps(geoj)
 
 
 def test_shapes_geo_interface():
     with shapefile.Reader("shapefiles/blockgroups") as r:
         geoj = r.shapes().__geo_interface__
-        assert geoj["type"] == "GeometryCollection"
+        assert geoj['type'] == 'GeometryCollection'
         assert json.dumps(geoj)
 
 
 def test_shaperecords_geo_interface():
     with shapefile.Reader("shapefiles/blockgroups") as r:
         geoj = r.shapeRecords().__geo_interface__
-        assert geoj["type"] == "FeatureCollection"
+        assert geoj['type'] == 'FeatureCollection'
         assert json.dumps(geoj)
 
 
@@ -493,49 +256,35 @@ def test_reader_url():
     """
     Assert that Reader can open shapefiles from a url.
     """
-
-    # Allow testing loading of shapefiles from a url on localhost (to avoid
-    # overloading external servers, and associated spurious test failures).
-    # A suitable repo of test files, and a localhost server setup is
-    # defined in ./.github/actions/test/actions.yml
-    if shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST:
-
-        def Reader(url):
-            new_url = shapefile._replace_remote_url(url)
-            print("repr(new_url): %s" % repr(new_url))
-            return shapefile.Reader(new_url)
-    else:
-        print("Using plain Reader")
-        Reader = shapefile.Reader
-
     # test with extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
-    with Reader(url) as sf:
-        for __recShape in sf.iterShapeRecords():
+    with shapefile.Reader(url) as sf:
+        for recShape in sf.iterShapeRecords():
             pass
-    assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
-    with Reader(url) as sf:
-        for __recShape in sf.iterShapeRecords():
+    with shapefile.Reader(url) as sf:
+        for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test no files found
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
     with pytest.raises(shapefile.ShapefileException):
-        with Reader(url) as sf:
+        with shapefile.Reader(url) as sf:
             pass
 
     # test reading zipfile from url
+    # url = "https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip"
     url = "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip"
-    with Reader(url) as sf:
-        for __recShape in sf.iterShapeRecords():
+    with shapefile.Reader(url) as sf:
+        for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
 
 def test_reader_zip():
@@ -548,25 +297,21 @@ def test_reader_zip():
             pass
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
-
+    
     # test require specific path when reading multi-shapefile zipfile
     with pytest.raises(shapefile.ShapefileException):
         with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip") as sf:
             pass
 
     # test specifying the path when reading multi-shapefile zipfile (with extension)
-    with shapefile.Reader(
-        "shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp"
-    ) as sf:
+    with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp") as sf:
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test specifying the path when reading multi-shapefile zipfile (without extension)
-    with shapefile.Reader(
-        "shapefiles/blockgroups_multishapefile.zip/blockgroups2"
-    ) as sf:
+    with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2") as sf:
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
@@ -606,9 +351,9 @@ def test_reader_close_filelike():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    shp = open("shapefiles/blockgroups.shp", mode="rb")
-    shx = open("shapefiles/blockgroups.shx", mode="rb")
-    dbf = open("shapefiles/blockgroups.dbf", mode="rb")
+    shp = open("shapefiles/blockgroups.shp", mode='rb')
+    shx = open("shapefiles/blockgroups.shx", mode='rb')
+    dbf = open("shapefiles/blockgroups.dbf", mode='rb')
     sf = shapefile.Reader(shp=shp, shx=shx, dbf=dbf)
     sf.close()
 
@@ -649,9 +394,9 @@ def test_reader_context_filelike():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    shp = open("shapefiles/blockgroups.shp", mode="rb")
-    shx = open("shapefiles/blockgroups.shx", mode="rb")
-    dbf = open("shapefiles/blockgroups.dbf", mode="rb")
+    shp = open("shapefiles/blockgroups.shp", mode='rb')
+    shx = open("shapefiles/blockgroups.shx", mode='rb')
+    dbf = open("shapefiles/blockgroups.dbf", mode='rb')
     with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as sf:
         pass
 
@@ -670,7 +415,7 @@ def test_reader_shapefile_type():
     is returned correctly.
     """
     with shapefile.Reader("shapefiles/blockgroups") as sf:
-        assert sf.shapeType is 5  # 5 means Polygon
+        assert sf.shapeType is 5   # 5 means Polygon
         assert sf.shapeType is shapefile.POLYGON
         assert sf.shapeTypeName is "POLYGON"
 
@@ -688,7 +433,7 @@ def test_reader_shapefile_length():
 def test_shape_metadata():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         shape = sf.shape(0)
-        assert shape.shapeType is 5  # Polygon
+        assert shape.shapeType is 5 # Polygon
         assert shape.shapeType is shapefile.POLYGON
         assert sf.shapeTypeName is "POLYGON"
 
@@ -705,10 +450,10 @@ def test_reader_fields():
         assert isinstance(fields, list)
 
         field = fields[0]
-        assert isinstance(field[0], str)  # field name
-        assert field[1] in ["C", "N", "F", "L", "D", "M"]  # field type
-        assert isinstance(field[2], int)  # field length
-        assert isinstance(field[3], int)  # decimal length
+        assert isinstance(field[0], str)    # field name
+        assert field[1] in ["C", "N", "F", "L", "D", "M"]   # field type
+        assert isinstance(field[2], int)    # field length
+        assert isinstance(field[3], int)    # decimal length
 
 
 def test_reader_shapefile_extension_ignored():
@@ -744,7 +489,7 @@ def test_reader_dbf_only():
     with shapefile.Reader(dbf="shapefiles/blockgroups.dbf") as sf:
         assert len(sf) == 663
         record = sf.record(3)
-        assert record[1:3] == ["060750601001", 4715]
+        assert record[1:3] == ['060750601001', 4715]
 
 
 def test_reader_shp_shx_only():
@@ -753,28 +498,24 @@ def test_reader_shp_shx_only():
     shp and shx argument to the shapefile reader
     reads just the shp and shx file.
     """
-    with shapefile.Reader(
-        shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx"
-    ) as sf:
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) is 173
 
-
+    
 def test_reader_shp_dbf_only():
     """
     Assert that specifying just the
     shp and shx argument to the shapefile reader
     reads just the shp and dbf file.
     """
-    with shapefile.Reader(
-        shp="shapefiles/blockgroups.shp", dbf="shapefiles/blockgroups.dbf"
-    ) as sf:
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp", dbf="shapefiles/blockgroups.dbf") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) is 173
         record = sf.record(3)
-        assert record[1:3] == ["060750601001", 4715]
+        assert record[1:3] == ['060750601001', 4715]
 
 
 def test_reader_shp_only():
@@ -798,7 +539,7 @@ def test_reader_filelike_dbf_only():
     with shapefile.Reader(dbf=open("shapefiles/blockgroups.dbf", "rb")) as sf:
         assert len(sf) == 663
         record = sf.record(3)
-        assert record[1:3] == ["060750601001", 4715]
+        assert record[1:3] == ['060750601001', 4715]
 
 
 def test_reader_filelike_shp_shx_only():
@@ -807,10 +548,7 @@ def test_reader_filelike_shp_shx_only():
     shp and shx argument to the shapefile reader
     reads just the shp and shx file.
     """
-    with shapefile.Reader(
-        shp=open("shapefiles/blockgroups.shp", "rb"),
-        shx=open("shapefiles/blockgroups.shx", "rb"),
-    ) as sf:
+    with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), shx=open("shapefiles/blockgroups.shx", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) is 173
@@ -822,15 +560,12 @@ def test_reader_filelike_shp_dbf_only():
     shp and shx argument to the shapefile reader
     reads just the shp and dbf file.
     """
-    with shapefile.Reader(
-        shp=open("shapefiles/blockgroups.shp", "rb"),
-        dbf=open("shapefiles/blockgroups.dbf", "rb"),
-    ) as sf:
+    with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), dbf=open("shapefiles/blockgroups.dbf", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) is 173
         record = sf.record(3)
-        assert record[1:3] == ["060750601001", 4715]
+        assert record[1:3] == ['060750601001', 4715]
 
 
 def test_reader_filelike_shp_only():
@@ -853,7 +588,7 @@ def test_reader_shapefile_delayed_load():
     with shapefile.Reader() as sf:
         # assert that data request raises exception, since no file has been provided yet
         with pytest.raises(shapefile.ShapefileException):
-            sf.shape(0)
+            sf.shape(0) 
         # assert that works after loading file manually
         sf.load("shapefiles/blockgroups")
         assert len(sf) == 663
@@ -872,7 +607,7 @@ def test_records_match_shapes():
 
 def test_record_attributes(fields=None):
     """
-    Assert that record retrieves all relevant values and can
+    Assert that record retrieves all relevant values and can 
     be accessed as attributes and dictionary items.
     """
     # note
@@ -889,9 +624,7 @@ def test_record_attributes(fields=None):
             else:
                 # default all fields
                 record = full_record
-                fields = [
-                    field[0] for field in sf.fields[1:]
-                ]  # fieldnames, sans del flag
+                fields = [field[0] for field in sf.fields[1:]] # fieldnames, sans del flag
             # check correct length
             assert len(record) == len(set(fields))
             # check record values (should be in same order as shapefile fields)
@@ -899,28 +632,26 @@ def test_record_attributes(fields=None):
             for field in sf.fields:
                 field_name = field[0]
                 if field_name in fields:
-                    assert (
-                        record[i] == record[field_name] == getattr(record, field_name)
-                    )
+                    assert record[i] == record[field_name] == getattr(record, field_name)
                     i += 1
 
 
 def test_record_subfields():
     """
-    Assert that reader correctly retrieves only a subset
+    Assert that reader correctly retrieves only a subset 
     of fields when specified.
     """
-    fields = ["AREA", "POP1990", "MALES", "FEMALES", "MOBILEHOME"]
+    fields = ["AREA","POP1990","MALES","FEMALES","MOBILEHOME"]
     test_record_attributes(fields=fields)
 
 
 def test_record_subfields_unordered():
     """
-    Assert that reader correctly retrieves only a subset
-    of fields when specified, given in random order but
-    retrieved in the order of the shapefile fields.
+    Assert that reader correctly retrieves only a subset 
+    of fields when specified, given in random order but 
+    retrieved in the order of the shapefile fields. 
     """
-    fields = sorted(["AREA", "POP1990", "MALES", "FEMALES", "MOBILEHOME"])
+    fields = sorted(["AREA","POP1990","MALES","FEMALES","MOBILEHOME"])
     test_record_attributes(fields=fields)
 
 
@@ -928,7 +659,7 @@ def test_record_subfields_delflag_notvalid():
     """
     Assert that reader does not consider DeletionFlag as a valid field name.
     """
-    fields = ["DeletionFlag", "AREA", "POP1990", "MALES", "FEMALES", "MOBILEHOME"]
+    fields = ["DeletionFlag","AREA","POP1990","MALES","FEMALES","MOBILEHOME"]
     with pytest.raises(ValueError):
         test_record_attributes(fields=fields)
 
@@ -936,9 +667,9 @@ def test_record_subfields_delflag_notvalid():
 def test_record_subfields_duplicates():
     """
     Assert that reader correctly retrieves only a subset
-    of fields when specified, handling duplicate input fields.
+    of fields when specified, handling duplicate input fields. 
     """
-    fields = ["AREA", "AREA", "AREA", "MALES", "MALES", "MOBILEHOME"]
+    fields = ["AREA","AREA","AREA","MALES","MALES","MOBILEHOME"]
     test_record_attributes(fields=fields)
     # check that only 3 values
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -949,7 +680,7 @@ def test_record_subfields_duplicates():
 def test_record_subfields_empty():
     """
     Assert that reader does not retrieve any fields when given
-    an empty list.
+    an empty list. 
     """
     fields = []
     test_record_attributes(fields=fields)
@@ -983,13 +714,13 @@ def test_record_oid():
             record = sf.record(i)
             assert record.oid == i
 
-        for i, record in enumerate(sf.records()):
+        for i,record in enumerate(sf.records()):
             assert record.oid == i
 
-        for i, record in enumerate(sf.iterRecords()):
+        for i,record in enumerate(sf.iterRecords()):
             assert record.oid == i
 
-        for i, shaperec in enumerate(sf.iterShapeRecords()):
+        for i,shaperec in enumerate(sf.iterShapeRecords()):
             assert shaperec.record.oid == i
 
 
@@ -1003,13 +734,13 @@ def test_shape_oid():
             shape = sf.shape(i)
             assert shape.oid == i
 
-        for i, shape in enumerate(sf.shapes()):
+        for i,shape in enumerate(sf.shapes()):
             assert shape.oid == i
 
-        for i, shape in enumerate(sf.iterShapes()):
+        for i,shape in enumerate(sf.iterShapes()):
             assert shape.oid == i
 
-        for i, shaperec in enumerate(sf.iterShapeRecords()):
+        for i,shaperec in enumerate(sf.iterShapeRecords()):
             assert shaperec.shape.oid == i
 
 
@@ -1019,28 +750,27 @@ def test_shape_oid_no_shx():
     its index in the shapefile, when shx file is missing.
     """
     basename = "shapefiles/blockgroups"
-    shp = open(basename + ".shp", "rb")
-    dbf = open(basename + ".dbf", "rb")
-    with shapefile.Reader(shp=shp, dbf=dbf) as sf, shapefile.Reader(
-        basename
-    ) as sf_expected:
+    shp = open(basename + ".shp", 'rb')
+    dbf = open(basename + ".dbf", 'rb')
+    with shapefile.Reader(shp=shp, dbf=dbf) as sf, \
+        shapefile.Reader(basename) as sf_expected:
         for i in range(len(sf)):
             shape = sf.shape(i)
             assert shape.oid == i
             shape_expected = sf_expected.shape(i)
             assert shape.__geo_interface__ == shape_expected.__geo_interface__
 
-        for i, shape in enumerate(sf.shapes()):
+        for i,shape in enumerate(sf.shapes()):
             assert shape.oid == i
             shape_expected = sf_expected.shape(i)
             assert shape.__geo_interface__ == shape_expected.__geo_interface__
 
-        for i, shape in enumerate(sf.iterShapes()):
+        for i,shape in enumerate(sf.iterShapes()):
             assert shape.oid == i
             shape_expected = sf_expected.shape(i)
             assert shape.__geo_interface__ == shape_expected.__geo_interface__
 
-        for i, shaperec in enumerate(sf.iterShapeRecords()):
+        for i,shaperec in enumerate(sf.iterShapeRecords()):
             assert shaperec.shape.oid == i
             shape_expected = sf_expected.shape(i)
             assert shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
@@ -1048,8 +778,8 @@ def test_shape_oid_no_shx():
 
 def test_reader_offsets():
     """
-    Assert that reader will not read the shx offsets unless necessary,
-    i.e. requesting a shape index.
+    Assert that reader will not read the shx offsets unless necessary, 
+    i.e. requesting a shape index. 
     """
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
@@ -1062,12 +792,12 @@ def test_reader_offsets():
 
 def test_reader_offsets_no_shx():
     """
-    Assert that reading a shapefile without a shx file will not build
-    the offsets unless necessary, i.e. reading all the shapes.
+    Assert that reading a shapefile without a shx file will not build 
+    the offsets unless necessary, i.e. reading all the shapes. 
     """
     basename = "shapefiles/blockgroups"
-    shp = open(basename + ".shp", "rb")
-    dbf = open(basename + ".dbf", "rb")
+    shp = open(basename + ".shp", 'rb')
+    dbf = open(basename + ".dbf", 'rb')
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
         # offsets should not be built during loading
         assert not sf._offsets
@@ -1080,10 +810,11 @@ def test_reader_offsets_no_shx():
         assert len(sf._offsets) == len(shapes)
 
 
+
 def test_reader_numshapes():
     """
     Assert that reader reads the numShapes attribute from the
-    shx file header during loading.
+    shx file header during loading. 
     """
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
@@ -1100,8 +831,8 @@ def test_reader_numshapes_no_shx():
     reading all the shapes will set the numShapes attribute.
     """
     basename = "shapefiles/blockgroups"
-    shp = open(basename + ".shp", "rb")
-    dbf = open(basename + ".dbf", "rb")
+    shp = open(basename + ".shp", 'rb')
+    dbf = open(basename + ".dbf", 'rb')
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
         # numShapes should be unknown due to missing shx file
         assert sf.numShapes == None
@@ -1112,8 +843,8 @@ def test_reader_numshapes_no_shx():
 
 def test_reader_len():
     """
-    Assert that calling len() on reader is equal to length of
-    all shapes and records.
+    Assert that calling len() on reader is equal to length of 
+    all shapes and records. 
     """
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
@@ -1123,7 +854,7 @@ def test_reader_len():
 def test_reader_len_not_loaded():
     """
     Assert that calling len() on reader that hasn't loaded a shapefile
-    yet is equal to 0.
+    yet is equal to 0. 
     """
     with shapefile.Reader() as sf:
         assert len(sf) == 0
@@ -1132,10 +863,10 @@ def test_reader_len_not_loaded():
 def test_reader_len_dbf_only():
     """
     Assert that calling len() on reader when reading a dbf file only,
-    is equal to length of all records.
+    is equal to length of all records. 
     """
     basename = "shapefiles/blockgroups"
-    dbf = open(basename + ".dbf", "rb")
+    dbf = open(basename + ".dbf", 'rb')
     with shapefile.Reader(dbf=dbf) as sf:
         assert len(sf) == len(sf.records())
 
@@ -1143,11 +874,11 @@ def test_reader_len_dbf_only():
 def test_reader_len_no_dbf():
     """
     Assert that calling len() on reader when dbf file is missing,
-    is equal to length of all shapes.
+    is equal to length of all shapes. 
     """
     basename = "shapefiles/blockgroups"
-    shp = open(basename + ".shp", "rb")
-    shx = open(basename + ".shx", "rb")
+    shp = open(basename + ".shp", 'rb')
+    shx = open(basename + ".shx", 'rb')
     with shapefile.Reader(shp=shp, shx=shx) as sf:
         assert len(sf) == len(sf.shapes())
 
@@ -1155,10 +886,10 @@ def test_reader_len_no_dbf():
 def test_reader_len_no_dbf_shx():
     """
     Assert that calling len() on reader when dbf and shx file is missing,
-    is equal to length of all shapes.
+    is equal to length of all shapes. 
     """
     basename = "shapefiles/blockgroups"
-    shp = open(basename + ".shp", "rb")
+    shp = open(basename + ".shp", 'rb')
     with shapefile.Reader(shp=shp) as sf:
         assert len(sf) == len(sf.shapes())
 
@@ -1166,7 +897,7 @@ def test_reader_len_no_dbf_shx():
 def test_reader_corrupt_files():
     """
     Assert that reader is able to handle corrupt files by
-    strictly going off the header information.
+    strictly going off the header information. 
     """
     basename = "shapefiles/test/corrupt_too_long"
 
@@ -1176,10 +907,10 @@ def test_reader_corrupt_files():
         # add 10 line geoms
         for _ in range(10):
             w.record("value")
-            w.line([[(1, 1), (1, 2), (2, 2)]])
+            w.line([[(1,1),(1,2),(2,2)]])
         # add junk byte data to end of dbf and shp files
-        w.dbf.write(b"12345")
-        w.shp.write(b"12345")
+        w.dbf.write(b'12345')
+        w.shp.write(b'12345')
 
     # read the corrupt shapefile and assert that it reads correctly
     with shapefile.Reader(basename) as sf:
@@ -1204,7 +935,7 @@ def test_reader_corrupt_files():
 def test_bboxfilter_shape():
     """
     Assert that applying the bbox filter to shape() correctly ignores the shape
-    if it falls outside, and returns it if inside.
+    if it falls outside, and returns it if inside. 
     """
     inside = [-122.4, 37.8, -122.35, 37.82]
     outside = list(inside)
@@ -1218,7 +949,7 @@ def test_bboxfilter_shape():
 def test_bboxfilter_shapes():
     """
     Assert that applying the bbox filter to shapes() correctly ignores shapes
-    that fall outside, and returns those that fall inside.
+    that fall outside, and returns those that fall inside. 
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1232,7 +963,7 @@ def test_bboxfilter_shapes():
         # compare
         assert len(shapes) == len(manual)
         # check that they line up
-        for shape, man in zip(shapes, manual):
+        for shape,man in zip(shapes,manual):
             assert shape.oid == man.oid
             assert shape.__geo_interface__ == man.__geo_interface__
 
@@ -1240,7 +971,7 @@ def test_bboxfilter_shapes():
 def test_bboxfilter_shapes_outside():
     """
     Assert that applying the bbox filter to shapes() correctly returns
-    no shapes when the bbox is outside the entire shapefile.
+    no shapes when the bbox is outside the entire shapefile. 
     """
     bbox = [-180, 89, -179, 90]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1251,7 +982,7 @@ def test_bboxfilter_shapes_outside():
 def test_bboxfilter_itershapes():
     """
     Assert that applying the bbox filter to iterShapes() correctly ignores shapes
-    that fall outside, and returns those that fall inside.
+    that fall outside, and returns those that fall inside. 
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1265,7 +996,7 @@ def test_bboxfilter_itershapes():
         # compare
         assert len(shapes) == len(manual)
         # check that they line up
-        for shape, man in zip(shapes, manual):
+        for shape,man in zip(shapes,manual):
             assert shape.oid == man.oid
             assert shape.__geo_interface__ == man.__geo_interface__
 
@@ -1273,7 +1004,7 @@ def test_bboxfilter_itershapes():
 def test_bboxfilter_shaperecord():
     """
     Assert that applying the bbox filter to shapeRecord() correctly ignores the shape
-    if it falls outside, and returns it if inside.
+    if it falls outside, and returns it if inside. 
     """
     inside = [-122.4, 37.8, -122.35, 37.82]
     outside = list(inside)
@@ -1291,7 +1022,7 @@ def test_bboxfilter_shaperecord():
 def test_bboxfilter_shaperecords():
     """
     Assert that applying the bbox filter to shapeRecords() correctly ignores shapes
-    that fall outside, and returns those that fall inside.
+    that fall outside, and returns those that fall inside. 
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1305,7 +1036,7 @@ def test_bboxfilter_shaperecords():
         # compare
         assert len(shaperecs) == len(manual)
         # check that they line up
-        for shaperec, man in zip(shaperecs, manual):
+        for shaperec,man in zip(shaperecs,manual):
             # oids
             assert shaperec.shape.oid == shaperec.record.oid
             # same shape as manual
@@ -1319,7 +1050,7 @@ def test_bboxfilter_shaperecords():
 def test_bboxfilter_itershaperecords():
     """
     Assert that applying the bbox filter to iterShapeRecords() correctly ignores shapes
-    that fall outside, and returns those that fall inside.
+    that fall outside, and returns those that fall inside. 
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1333,7 +1064,7 @@ def test_bboxfilter_itershaperecords():
         # compare
         assert len(shaperecs) == len(manual)
         # check that they line up
-        for shaperec, man in zip(shaperecs, manual):
+        for shaperec,man in zip(shaperecs,manual):
             # oids
             assert shaperec.shape.oid == shaperec.record.oid
             # same shape as manual
@@ -1386,7 +1117,7 @@ def test_shaperecord_record():
         shaperec = sf.shapeRecord(3)
         record = shaperec.record
 
-        assert record[1:3] == ["060750601001", 4715]
+        assert record[1:3] == ['060750601001', 4715]
 
 
 def test_write_field_name_limit(tmpdir):
@@ -1395,11 +1126,11 @@ def test_write_field_name_limit(tmpdir):
     """
     filename = tmpdir.join("test.shp").strpath
     with shapefile.Writer(filename) as writer:
-        writer.field("a" * 5, "C")  # many under length limit
-        writer.field("a" * 9, "C")  # 1 under length limit
-        writer.field("a" * 10, "C")  # at length limit
-        writer.field("a" * 11, "C")  # 1 over length limit
-        writer.field("a" * 20, "C")  # many over limit
+        writer.field('a'*5, 'C') # many under length limit
+        writer.field('a'*9, 'C') # 1 under length limit
+        writer.field('a'*10, 'C') # at length limit
+        writer.field('a'*11, 'C') # 1 over length limit
+        writer.field('a'*20, 'C') # many over limit
 
     with shapefile.Reader(filename) as reader:
         fields = reader.fields[1:]
@@ -1417,7 +1148,7 @@ def test_write_shp_only(tmpdir):
     creates just a shp file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(shp=filename + ".shp") as writer:
+    with shapefile.Writer(shp=filename+'.shp') as writer:
         writer.point(1, 1)
     assert writer.shp and not writer.shx and not writer.dbf
     assert writer.shpNum == 1
@@ -1425,22 +1156,19 @@ def test_write_shp_only(tmpdir):
     assert writer.shp.closed == True
 
     # assert test.shp exists
-    assert os.path.exists(filename + ".shp")
-
+    assert os.path.exists(filename+'.shp')
+    
     # test that can read shapes
-    with shapefile.Reader(shp=filename + ".shp") as reader:
+    with shapefile.Reader(shp=filename+'.shp') as reader:
         assert reader.shp and not reader.shx and not reader.dbf
-        assert (reader.numRecords, reader.numShapes) == (
-            None,
-            None,
-        )  # numShapes is unknown in the absence of shx file
+        assert (reader.numRecords, reader.numShapes) == (None, None) # numShapes is unknown in the absence of shx file
         assert len(reader.shapes()) == 1
 
     # assert test.shx does not exist
-    assert not os.path.exists(filename + ".shx")
+    assert not os.path.exists(filename+'.shx')
 
     # assert test.dbf does not exist
-    assert not os.path.exists(filename + ".dbf")
+    assert not os.path.exists(filename+'.dbf')
 
 
 def test_write_shp_shx_only(tmpdir):
@@ -1450,7 +1178,7 @@ def test_write_shp_shx_only(tmpdir):
     creates just a shp and shx file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(shp=filename + ".shp", shx=filename + ".shx") as writer:
+    with shapefile.Writer(shp=filename+'.shp', shx=filename+'.shx') as writer:
         writer.point(1, 1)
     assert writer.shp and writer.shx and not writer.dbf
     assert writer.shpNum == 1
@@ -1458,21 +1186,21 @@ def test_write_shp_shx_only(tmpdir):
     assert writer.shp.closed == writer.shx.closed == True
 
     # assert test.shp exists
-    assert os.path.exists(filename + ".shp")
+    assert os.path.exists(filename+'.shp')
 
     # assert test.shx exists
-    assert os.path.exists(filename + ".shx")
+    assert os.path.exists(filename+'.shx')
 
     # test that can read shapes and offsets
-    with shapefile.Reader(shp=filename + ".shp", shx=filename + ".shx") as reader:
+    with shapefile.Reader(shp=filename+'.shp', shx=filename+'.shx') as reader:
         assert reader.shp and reader.shx and not reader.dbf
         assert (reader.numRecords, reader.numShapes) == (None, 1)
-        reader.shape(0)  # trigger reading of shx offsets
+        reader.shape(0) # trigger reading of shx offsets
         assert len(reader._offsets) == 1
         assert len(reader.shapes()) == 1
 
     # assert test.dbf does not exist
-    assert not os.path.exists(filename + ".dbf")
+    assert not os.path.exists(filename+'.dbf')
 
 
 def test_write_shp_dbf_only(tmpdir):
@@ -1482,9 +1210,9 @@ def test_write_shp_dbf_only(tmpdir):
     creates just a shp and dbf file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(shp=filename + ".shp", dbf=filename + ".dbf") as writer:
-        writer.field("field1", "C")  # required to create a valid dbf file
-        writer.record("value")
+    with shapefile.Writer(shp=filename+'.shp', dbf=filename+'.dbf') as writer:
+        writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
         writer.point(1, 1)
     assert writer.shp and not writer.shx and writer.dbf
     assert writer.shpNum == writer.recNum == 1
@@ -1492,23 +1220,20 @@ def test_write_shp_dbf_only(tmpdir):
     assert writer.shp.closed == writer.dbf.closed == True
 
     # assert test.shp exists
-    assert os.path.exists(filename + ".shp")
+    assert os.path.exists(filename+'.shp')
 
     # assert test.dbf exists
-    assert os.path.exists(filename + ".dbf")
-
+    assert os.path.exists(filename+'.dbf')
+    
     # test that can read records and shapes
-    with shapefile.Reader(shp=filename + ".shp", dbf=filename + ".dbf") as reader:
+    with shapefile.Reader(shp=filename+'.shp', dbf=filename+'.dbf') as reader:
         assert reader.shp and not reader.shx and reader.dbf
-        assert (reader.numRecords, reader.numShapes) == (
-            1,
-            None,
-        )  # numShapes is unknown in the absence of shx file
+        assert (reader.numRecords, reader.numShapes) == (1, None) # numShapes is unknown in the absence of shx file
         assert len(reader.records()) == 1
         assert len(reader.shapes()) == 1
 
     # assert test.shx does not exist
-    assert not os.path.exists(filename + ".shx")
+    assert not os.path.exists(filename+'.shx')
 
 
 def test_write_dbf_only(tmpdir):
@@ -1518,28 +1243,28 @@ def test_write_dbf_only(tmpdir):
     creates just a dbf file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(dbf=filename + ".dbf") as writer:
-        writer.field("field1", "C")  # required to create a valid dbf file
-        writer.record("value")
+    with shapefile.Writer(dbf=filename+'.dbf') as writer:
+        writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
     assert not writer.shp and not writer.shx and writer.dbf
     assert writer.recNum == 1
     assert len(writer) == 1
     assert writer.dbf.closed == True
 
     # assert test.dbf exists
-    assert os.path.exists(filename + ".dbf")
+    assert os.path.exists(filename+'.dbf')
 
     # test that can read records
-    with shapefile.Reader(dbf=filename + ".dbf") as reader:
+    with shapefile.Reader(dbf=filename+'.dbf') as reader:
         assert not writer.shp and not writer.shx and writer.dbf
         assert (reader.numRecords, reader.numShapes) == (1, None)
         assert len(reader.records()) == 1
 
     # assert test.shp does not exist
-    assert not os.path.exists(filename + ".shp")
+    assert not os.path.exists(filename+'.shp')
 
     # assert test.shx does not exist
-    assert not os.path.exists(filename + ".shx")
+    assert not os.path.exists(filename+'.shx')
 
 
 def test_write_default_shp_shx_dbf(tmpdir):
@@ -1550,8 +1275,8 @@ def test_write_default_shp_shx_dbf(tmpdir):
     """
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename) as writer:
-        writer.field("field1", "C")  # required to create a valid dbf file
-        writer.record("value")
+        writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
         writer.null()
 
     # assert shp, shx, dbf files exist
@@ -1568,8 +1293,8 @@ def test_write_pathlike(tmpdir):
     filename = tmpdir.join("test")
     assert not isinstance(filename, str)
     with shapefile.Writer(filename) as writer:
-        writer.field("field1", "C")
-        writer.record("value")
+        writer.field('field1', 'C')
+        writer.record('value')
         writer.null()
     assert (filename + ".shp").ensure()
     assert (filename + ".shx").ensure()
@@ -1580,14 +1305,14 @@ def test_write_filelike(tmpdir):
     """
     Assert that file-like objects are written correctly.
     """
-    shp = open(tmpdir.join("test.shp").strpath, mode="wb+")
-    shx = open(tmpdir.join("test.shx").strpath, mode="wb+")
-    dbf = open(tmpdir.join("test.dbf").strpath, mode="wb+")
+    shp = open(tmpdir.join("test.shp").strpath, mode='wb+')
+    shx = open(tmpdir.join("test.shx").strpath, mode='wb+')
+    dbf = open(tmpdir.join("test.dbf").strpath, mode='wb+')
     with shapefile.Writer(shx=shx, dbf=dbf, shp=shp) as writer:
-        writer.field("field1", "C")  # required to create a valid dbf file
-        writer.record("value")
+        writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
         writer.null()
-
+        
     # test that filelike objects were written correctly
     with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as reader:
         assert len(reader) == 1
@@ -1600,9 +1325,9 @@ def test_write_close_path(tmpdir):
     closes the shp, shx, and dbf files
     on exit, if given paths.
     """
-    sf = shapefile.Writer(tmpdir.join("test"))
-    sf.field("field1", "C")  # required to create a valid dbf file
-    sf.record("value")
+    sf = shapefile.Writer(tmpdir.join('test'))
+    sf.field('field1', 'C') # required to create a valid dbf file
+    sf.record('value')
     sf.null()
     sf.close()
 
@@ -1611,7 +1336,7 @@ def test_write_close_path(tmpdir):
     assert sf.shx.closed is True
 
     # test that opens and reads correctly after
-    with shapefile.Reader(tmpdir.join("test")) as reader:
+    with shapefile.Reader(tmpdir.join('test')) as reader:
         assert len(reader) == 1
         assert reader.shape(0).shapeType == shapefile.NULL
 
@@ -1622,12 +1347,12 @@ def test_write_close_filelike(tmpdir):
     leaves the shp, shx, and dbf files open
     on exit, if given filelike objects.
     """
-    shp = open(tmpdir.join("test.shp").strpath, mode="wb+")
-    shx = open(tmpdir.join("test.shx").strpath, mode="wb+")
-    dbf = open(tmpdir.join("test.dbf").strpath, mode="wb+")
+    shp = open(tmpdir.join("test.shp").strpath, mode='wb+')
+    shx = open(tmpdir.join("test.shx").strpath, mode='wb+')
+    dbf = open(tmpdir.join("test.dbf").strpath, mode='wb+')
     sf = shapefile.Writer(shx=shx, dbf=dbf, shp=shp)
-    sf.field("field1", "C")  # required to create a valid dbf file
-    sf.record("value")
+    sf.field('field1', 'C') # required to create a valid dbf file
+    sf.record('value')
     sf.null()
     sf.close()
 
@@ -1647,9 +1372,9 @@ def test_write_context_path(tmpdir):
     closes the shp, shx, and dbf files
     on exit, if given paths.
     """
-    with shapefile.Writer(tmpdir.join("test")) as sf:
-        sf.field("field1", "C")  # required to create a valid dbf file
-        sf.record("value")
+    with shapefile.Writer(tmpdir.join('test')) as sf:
+        sf.field('field1', 'C') # required to create a valid dbf file
+        sf.record('value')
         sf.null()
 
     assert sf.shp.closed is True
@@ -1657,7 +1382,7 @@ def test_write_context_path(tmpdir):
     assert sf.shx.closed is True
 
     # test that opens and reads correctly after
-    with shapefile.Reader(tmpdir.join("test")) as reader:
+    with shapefile.Reader(tmpdir.join('test')) as reader:
         assert len(reader) == 1
         assert reader.shape(0).shapeType == shapefile.NULL
 
@@ -1668,12 +1393,12 @@ def test_write_context_filelike(tmpdir):
     leaves the shp, shx, and dbf files open
     on exit, if given filelike objects.
     """
-    shp = open(tmpdir.join("test.shp").strpath, mode="wb+")
-    shx = open(tmpdir.join("test.shx").strpath, mode="wb+")
-    dbf = open(tmpdir.join("test.dbf").strpath, mode="wb+")
+    shp = open(tmpdir.join("test.shp").strpath, mode='wb+')
+    shx = open(tmpdir.join("test.shx").strpath, mode='wb+')
+    dbf = open(tmpdir.join("test.dbf").strpath, mode='wb+')
     with shapefile.Writer(shx=shx, dbf=dbf, shp=shp) as sf:
-        sf.field("field1", "C")  # required to create a valid dbf file
-        sf.record("value")
+        sf.field('field1', 'C') # required to create a valid dbf file
+        sf.record('value')
         sf.null()
 
     assert sf.shp.closed is False
@@ -1695,7 +1420,7 @@ def test_write_shapefile_extension_ignored(tmpdir):
     ext = ".abc"
     filename = tmpdir.join(base + ext).strpath
     with shapefile.Writer(filename) as writer:
-        writer.field("field1", "C")  # required to create a valid dbf file
+        writer.field('field1', 'C') # required to create a valid dbf file
 
     # assert shp, shx, dbf files exist
     basepath = tmpdir.join(base).strpath
@@ -1710,18 +1435,18 @@ def test_write_shapefile_extension_ignored(tmpdir):
 def test_write_record(tmpdir):
     """
     Test that .record() correctly writes a record using either a list of *args
-    or a dict of **kwargs.
+    or a dict of **kwargs. 
     """
     filename = tmpdir.join("test.shp").strpath
     with shapefile.Writer(filename) as writer:
         writer.autoBalance = True
 
-        writer.field("one", "C")
-        writer.field("two", "C")
-        writer.field("three", "C")
-        writer.field("four", "C")
-
-        values = ["one", "two", "three", "four"]
+        writer.field('one', 'C') 
+        writer.field('two', 'C') 
+        writer.field('three', 'C') 
+        writer.field('four', 'C') 
+        
+        values = ['one','two','three','four']
         writer.record(*values)
         writer.record(*values)
 
@@ -1737,18 +1462,18 @@ def test_write_record(tmpdir):
 def test_write_partial_record(tmpdir):
     """
     Test that .record() correctly writes a partial record (given only some of the values)
-    using either a list of *args or a dict of **kwargs. Should fill in the gaps.
+    using either a list of *args or a dict of **kwargs. Should fill in the gaps. 
     """
     filename = tmpdir.join("test.shp").strpath
     with shapefile.Writer(filename) as writer:
         writer.autoBalance = True
-
-        writer.field("one", "C")
-        writer.field("two", "C")
-        writer.field("three", "C")
-        writer.field("four", "C")
-
-        values = ["one", "two"]
+        
+        writer.field('one', 'C') 
+        writer.field('two', 'C') 
+        writer.field('three', 'C') 
+        writer.field('four', 'C') 
+        
+        values = ['one','two']
         writer.record(*values)
         writer.record(*values)
 
@@ -1758,7 +1483,7 @@ def test_write_partial_record(tmpdir):
 
     with shapefile.Reader(filename) as reader:
         expected = list(values)
-        expected.extend(["", ""])
+        expected.extend(['',''])
         for record in reader.iterRecords():
             assert record == expected
 
@@ -1771,13 +1496,13 @@ def test_write_geojson(tmpdir):
     """
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename) as w:
-        w.field("TEXT", "C")
-        w.field("NUMBER", "N")
-        w.field("DATE", "D")
-        w.record("text", 123, datetime.date(1898, 1, 30))
-        w.record("text", 123, [1998, 1, 30])
-        w.record("text", 123, "19980130")
-        w.record("text", 123, "-9999999")  # faulty date
+        w.field('TEXT', 'C')
+        w.field('NUMBER', 'N')
+        w.field('DATE', 'D')
+        w.record('text', 123, datetime.date(1898,1,30))
+        w.record('text', 123, [1998,1,30])
+        w.record('text', 123, '19980130')
+        w.record('text', 123, '-9999999') # faulty date
         w.record(None, None, None)
         w.null()
         w.null()
@@ -1792,19 +1517,17 @@ def test_write_geojson(tmpdir):
         assert json.dumps(r.__geo_interface__)
 
 
-shape_types = [
-    k for k in shapefile.SHAPETYPE_LOOKUP.keys() if k != 31
-]  # exclude multipatch
+shape_types = [k for k in shapefile.SHAPETYPE_LOOKUP.keys() if k != 31] # exclude multipatch
 
 
 @pytest.mark.parametrize("shape_type", shape_types)
 def test_write_empty_shapefile(tmpdir, shape_type):
     """
-    Assert that can write an empty shapefile, for all different shape types.
+    Assert that can write an empty shapefile, for all different shape types. 
     """
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename, shapeType=shape_type) as w:
-        w.field("field1", "C")  # required to create a valid dbf file
+        w.field('field1', 'C') # required to create a valid dbf file
 
     with shapefile.Reader(filename) as r:
         # test correct shape type
