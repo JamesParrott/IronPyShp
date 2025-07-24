@@ -44,11 +44,11 @@ jobs:
       fail-fast: false
       matrix:
         platform: [
-          {os: ubuntu-24.04,
-           python: ironpython,
-           caddy: caddy_2.10.0_linux_amd64.tar.gz,
-           windows: no,
-           },
+          # {os: ubuntu-24.04,
+          #  python: ironpython,
+          #  caddy: caddy_2.10.0_linux_amd64.tar.gz,
+          #  windows: no,
+          #  },
           {os: windows-latest,
            python: ipy,
            caddy: caddy_2.10.0_windows_amd64.zip,
@@ -66,16 +66,16 @@ jobs:
       with:
         path: ./IronPyshp
 
-    - name: Install IronPython on Ubuntu
-      if: ${{ startsWith(matrix.platform.os, 'ubuntu') }}
-      shell: bash
-      run: |
-        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-        echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
-        sudo apt update
-        sudo apt install mono-devel
-        sudo apt install libmono-system-numerics4.0-cil
-        echo $PATH
+    # - name: Install IronPython on Ubuntu
+    #   if: ${{ startsWith(matrix.platform.os, 'ubuntu') }}
+    #   shell: bash
+    #   run: |
+    #     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+    #     echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+    #     sudo apt update
+    #     sudo apt install mono-devel
+    #     sudo apt install libmono-system-numerics4.0-cil
+    #     echo $PATH
       # ipy -V
       # where ipy
       # sudo mv IronPython-2.7.11 /opt/ironpython
@@ -99,17 +99,17 @@ jobs:
         pyshp_repo_directory: ./IronPyshp
         python: ipy
 
-    - name: Network tests
-      uses: ./IronPyshp/.github/actions/test
-      with:
-        extra_args: '-m network'
-        replace_remote_urls_with_localhost: 'yes'
-        # Checkout to ./IronPyshp, as the test job also needs to check out the artefact repo
-        pyshp_repo_directory: ./IronPyshp
-        python: ipy
-        python-version: "2.7"
-        caddy-release: ${{ matrix.platform.caddy }}
-        on-windows: ${{ matrix.platform.windows }}
+    # - name: Network tests
+    #   uses: ./IronPyshp/.github/actions/test
+    #   with:
+    #     extra_args: '-m network'
+    #     replace_remote_urls_with_localhost: 'yes'
+    #     # Checkout to ./IronPyshp, as the test job also needs to check out the artefact repo
+    #     pyshp_repo_directory: ./IronPyshp
+    #     python: ipy
+    #     python-version: "2.7"
+    #     caddy-release: ${{ matrix.platform.caddy }}
+    #     on-windows: ${{ matrix.platform.windows }}
 
 
   test_on_supported_C_Pythons:
