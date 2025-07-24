@@ -2948,6 +2948,9 @@ def _test(args = sys.argv[1:], verbosity = False):
             if sys.version_info[0] == 2:
                 got = re.sub("u'(.*?)'", "'\\1'", got)
                 got = re.sub('u"(.*?)"', '"\\1"', got)
+                if IRON_PYTHON:
+                    # Don't fail tests due to negligible floating point differences
+                    got = re.sub(r"\d*\.\d*[90]{7,}\d?", lambda m: str(round(float(m.group(0)),7)), got)
             res = doctest.OutputChecker.check_output(self, want, got, optionflags)
             return res
 
