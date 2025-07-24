@@ -7,7 +7,7 @@ Bonus: Preserves the order of fields in shape files in `Record.as_dict()` by set
 
 - **Reluctant Iron Python 2 user**: [James Parrott](https://github.com/JamesParrott)
 - **Version**: 2.3.2
-- **Date**: 18 April, 2023
+- **Date**: 24 July 2025
  - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 # PyShp
