@@ -189,7 +189,10 @@ else:
 
     def is_string(v):
         return isinstance(v, basestring)
-
+# Save reference to possibly unordered dict, to 
+# instead of dict for isinstance({}, dict) calls
+# after we possibly patch dict = collections.OrderedDict
+_dict = dict
 
 if sys.version_info[0:2] >= (3, 6):
 
@@ -2292,7 +2295,7 @@ class Writer(object):
         if not isinstance(s, Shape):
             if hasattr(s, "__geo_interface__"):
                 s = s.__geo_interface__
-            if isinstance(s, dict):
+            if isinstance(s, _dict):
                 s = Shape._from_geojson(s)
             else:
                 raise Exception(
