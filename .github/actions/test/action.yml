@@ -85,7 +85,9 @@ runs:
       working-directory: dist/
       run: |
         WHEEL_NAME=$(ls ironpyshp-*py3-none-any.whl)
-        python -m pip install $WHEEL_NAME[test]
+        python -m pip install $WHEEL_NAME
+        python -m pip install -r requirements.test.txt
+      # python -m pip install $WHEEL_NAME[test]
 
     - name: Show Python and Pytest versions for logs.
       shell: bash
