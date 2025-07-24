@@ -12,7 +12,6 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-  push:
 
 jobs:
   format_type_check_lint_build_and_test:
@@ -40,10 +39,10 @@ jobs:
 
 
 
-    # - name: Publish package
-    #   if: github.repository == 'JamesParrott/IronPyShp'
-    #   uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
-    #   with:
-    #     user: __token__
-    #     password: ${{ secrets.PYPI_INTEGRATION }}
-    #     packages-dir: dist/
+    - name: Publish package
+      if: github.repository == 'JamesParrott/IronPyShp'
+      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_INTEGRATION }}
+        packages-dir: dist/
