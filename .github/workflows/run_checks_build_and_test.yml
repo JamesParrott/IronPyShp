@@ -80,11 +80,12 @@ jobs:
         pyshp_repo_directory: ./IronPyshp
 
   test_on_EOL_Pythons:
+    needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
       matrix:
         python-version: [
-            # "2.7",
+            "2.7",
             "3.5",
             "3.6",
             "3.7",
