@@ -2945,6 +2945,9 @@ def _test(args = sys.argv[1:], verbosity = False):
 
     class Py23DocChecker(doctest.OutputChecker):
         def check_output(self, want, got, optionflags):
+            if sys.version_info[0] == 2:
+                got = re.sub("u'(.*?)'", "'\\1'", got)
+                got = re.sub('u"(.*?)"', '"\\1"', got)
             res = doctest.OutputChecker.check_output(self, want, got, optionflags)
             return res
 
