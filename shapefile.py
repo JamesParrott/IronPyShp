@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 # Module settings
 VERBOSE = True
 
+# Test config (for the Doctest runner and test_shapefile.py)
+REPLACE_REMOTE_URLS_WITH_LOCALHOST = (
+    os.getenv("REPLACE_REMOTE_URLS_WITH_LOCALHOST", "").lower() == "yes"
+)
+
 # Constants for shape types
 NULL = 0
 POINT = 1
@@ -1922,7 +1927,7 @@ class Reader(object):
                 yield ShapeRecord(shape=shape, record=record)
         else:
             # only iterate where shape.bbox overlaps with the given bbox
-            # TODO: internal __record method should be faster but would have to
+            # TODOernal __record method should be faster but would have to
             # make sure to seek to correct file location...
 
             # fieldTuples,recLookup,recStruct = self.__recordFields(fields)
@@ -2393,7 +2398,7 @@ class Writer(object):
                     f.write(
                         pack(
                             "<%sd" % len(s.m),
-                            *[m if m is not None else NODATA for m in s.m],
+                            *[m if m is not None else NODATA for m in s.m]
                         )
                     )
                 else:
@@ -2804,7 +2809,12 @@ class Writer(object):
 
 
 # Begin Testing
-def _get_doctests() -> doctest.DocTest:
+def _get_doctests():
+
+
+    import doctest
+    doctest.NORMALIZE_WHITESPACE = 1
+
     # run tests
     with open("README.md", "rb") as fobj:
         tests = doctest.DocTestParser().get_doctest(
@@ -2819,10 +2829,10 @@ def _get_doctests() -> doctest.DocTest:
 
 
 def _filter_network_doctests(
-    examples: Iterable[doctest.Example],
-    include_network: bool = False,
-    include_non_network: bool = True,
-) -> Iterator[doctest.Example]:
+    examples,
+    include_network = False,
+    include_non_network = True,
+):
     globals_from_network_doctests = set()
 
     if not (include_network or include_non_network):
@@ -2863,16 +2873,16 @@ def _filter_network_doctests(
 
 
 def _replace_remote_url(
-    old_url: str,
+    old_url,
     # Default port of Python http.server and Python 2's SimpleHttpServer
-    port: int = 8000,
-    scheme: str = "http",
-    netloc: str = "localhost",
-    path: Optional[str] = None,
-    params: str = "",
-    query: str = "",
-    fragment: str = "",
-) -> str:
+    port = 8000,
+    scheme = "http",
+    netloc = "localhost",
+    path = None,
+    params = "",
+    query = "",
+    fragment = "",
+):
     old_parsed = urlparse(old_url)
 
     # Strip subpaths, so an artefacts
@@ -2881,7 +2891,7 @@ def _replace_remote_url(
         path = old_parsed.path.rpartition("/")[2]
 
     if port not in (None, ""):
-        netloc = f"{netloc}:{port}"
+        netloc = "%s:%s" % (netloc, port)
 
     new_parsed = old_parsed._replace(
         scheme=scheme,
@@ -2896,11 +2906,15 @@ def _replace_remote_url(
     return new_url
 
 
-def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
+def _test(args = sys.argv[1:], verbosity = False):
     if verbosity == 0:
         print("Getting doctests...")
 
     import re
+
+    import doctest
+
+    doctest.NORMALIZE_WHITESPACE = 1
 
     tests = _get_doctests()
 
@@ -2938,7 +2952,7 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
     runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
 
     if verbosity == 0:
-        print(f"Running {len(tests.examples)} doctests...")
+        print("Running %s doctests..." % len(tests.examples))
     failure_count, test_count = runner.run(tests)
 
     # print results
