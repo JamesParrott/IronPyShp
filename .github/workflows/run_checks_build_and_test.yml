@@ -37,15 +37,12 @@ jobs:
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
-name: IronPython CI
-
-on: [push, pull_request]
 
   test_on_IronPython_2.7:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-latest, macos-latest]
 
     steps:
     - uses: actions/checkout@v3
