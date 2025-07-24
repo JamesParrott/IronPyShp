@@ -5,6 +5,10 @@ description:
   Run pytest, and run the doctest runner (shapefile.py as a script).
 
 inputs:
+  python:
+    description: The Python to use
+    required: false
+    default: 'python'
   extra_args:
     description: Extra command line args for Pytest and python shapefile.py
     default: '-m "not network"'
@@ -88,7 +92,7 @@ runs:
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:
         REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
-      run: python shapefile.py ${{ inputs.extra_args }}
+      run: ${{ inputs.python }} shapefile.py ${{ inputs.extra_args }}
 
 
     - name: Download wheel and sdist (built in previous jobs)
@@ -98,25 +102,28 @@ runs:
         path: dist
 
     - name: Install test deps
+      if: ${{ inputs.python == 'python' }} 
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
-      run: python -m pip install -r requirements.test.txt
+      run: ${{ inputs.python }} -m pip install -r requirements.test.txt
 
     - name: Install IronPyShp from the wheel (built in prev step)
+      if: ${{ inputs.python == 'python' }} 
       shell: bash
       working-directory: dist/
       run: |
         WHEEL_NAME=$(ls ironpyshp-*py3-none-any.whl)
-        python -m pip install $WHEEL_NAME
+        ${{ inputs.python }} -m pip install $WHEEL_NAME
       # python -m pip install $WHEEL_NAME[test]
 
     - name: Show Python and Pytest versions for logs.
       shell: bash
       run: |
-        python --version
+        ${{ inputs.python }} --version
         python -m pytest --version
 
     - name: Run Pytest
+      if: ${{ inputs.python == 'python' }} 
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:

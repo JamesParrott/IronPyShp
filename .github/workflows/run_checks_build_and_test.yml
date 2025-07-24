@@ -37,7 +37,58 @@ jobs:
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
-  test_on_supported_Pythons:
+name: IronPython CI
+
+on: [push, pull_request]
+
+  test_on_IronPython_2.7:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install IronPython on Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y unzip
+        curl -L -o ironpython.tar.gz https://github.com/IronLanguages/ironpython2/releases/download/ipy-2.7.11/IronPython-2.7.11.tar.gz
+        tar -xzf ironpython.tar.gz
+        sudo mv IronPython-2.7.11 /opt/ironpython
+        echo "/opt/ironpython" >> $GITHUB_PATH
+
+    - name: Install IronPython on Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install ironpython --version=2.7.11 --yes
+        echo "C:\Program Files\IronPython 2.7" >> $env:GITHUB_PATH
+
+    - name: Install IronPython on macOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install --cask ironpython
+        echo "/Applications/IronPython-2.7.11" >> $GITHUB_PATH
+
+    - name: Non-network tests
+      uses: ./IronPyshp/.github/actions/test
+      with:
+        pyshp_repo_directory: ./IronPyshp
+        python: ipy
+
+    - name: Network tests
+      uses: ./IronPyshp/.github/actions/test
+      with:
+        extra_args: '-m network'
+        replace_remote_urls_with_localhost: 'yes'
+        # Checkout to ./IronPyshp, as the test job also needs to check out the artefact repo
+        pyshp_repo_directory: ./IronPyshp
+        python: ipy
+
+
+  test_on_supported_C_Pythons:
     needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
@@ -85,11 +136,11 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [
-            "2.7",
-            "3.5",
-            "3.6",
-            "3.7",
-            "3.8",
+            "2.7.18",
+            "3.5.10",
+            "3.6.15",
+            "3.7.17",
+            "3.8.18",
         ]
 
     runs-on: ubuntu-latest
