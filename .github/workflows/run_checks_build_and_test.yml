@@ -38,7 +38,7 @@ jobs:
       uses: ./.github/actions/build_wheel_and_sdist
 
 
-  test_on_IronPython_2.7:
+  test_on_IronPython_2_7:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
