@@ -51,7 +51,7 @@ jobs:
            },
           {os: windows-latest,
            python: ipy,
-           caddy: caddy_2.10.0_windows_amd64.zip, 
+           caddy: caddy_2.10.0_windows_amd64.zip,
            windows: yes,
            },
           {os: macos-latest,

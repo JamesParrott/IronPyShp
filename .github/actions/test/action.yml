@@ -18,7 +18,7 @@ inputs:
     default: 'no'
     required: false
   caddy-release:
-    default: caddy_2.10.0_linux_amd64
+    default: caddy_2.10.0_linux_amd64.tar.gz
   pyshp_repo_directory:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
     required: false
