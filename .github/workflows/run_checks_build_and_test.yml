@@ -3,7 +3,7 @@
 name: Run pre-commit hooks and tests
 
 on:
-  # push:
+  push:
   pull_request:
   workflow_call:
   workflow_dispatch:
