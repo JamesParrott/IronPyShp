@@ -5,6 +5,10 @@ description:
   Run pytest, and run the doctest runner (shapefile.py as a script).
 
 inputs:
+  python:
+    description: The Python to use
+    required: false
+    default: 'python'
   extra_args:
     description: Extra command line args for Pytest and python shapefile.py
     default: '-m "not network"'
@@ -13,10 +17,14 @@ inputs:
     description: yes or no.  Test loading shapefiles from a url, without overloading an external server from 30 parallel workflows.
     default: 'no'
     required: false
+  caddy-release:
+    default: caddy_2.10.0_linux_amd64.tar.gz
   pyshp_repo_directory:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
     required: false
     default: '.'
+  on-windows:
+    default: "no"
 
 
 
@@ -58,7 +66,7 @@ runs:
         path: ./PyShp_test_shapefile
 
     - name: Serve shapefiles and zip file artefacts on localhost
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes'  && !startsWith(inputs.python-version, '2.7')}}
       shell: bash
       working-directory: ./PyShp_test_shapefile
       run: |
@@ -66,12 +74,37 @@ runs:
         echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
         sleep 4  # give server time to start
 
+    - name: Download and unzip Caddy binary
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows != 'yes' }}
+      working-directory: .
+      shell: bash
+      run: |
+        curl -L https://github.com/caddyserver/caddy/releases/download/v2.10.0/${{ inputs.caddy-release }} --output caddy_archive
+        tar -xzf caddy_archive
+
+    - name: Download and unzip Caddy binary
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows == 'yes' }}
+      working-directory: .
+      shell: bash
+      run: |
+        curl -L https://github.com/caddyserver/caddy/releases/download/v2.10.0/${{ inputs.caddy-release }} --output caddy_archive
+        unzip caddy_archive
+
+    - name: Serve shapefiles and zip file artefacts on localhost using Caddy
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7')}}
+      shell: bash
+      working-directory: .
+      run: |
+        ./caddy file-server --root ./PyShp_test_shapefile --listen :8000 &
+        echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
+        sleep 2  # give server time to start
+
     - name: Doctests
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:
         REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
-      run: python shapefile.py ${{ inputs.extra_args }}
+      run: ${{ inputs.python }} shapefile.py ${{ inputs.extra_args }}
 
 
     - name: Download wheel and sdist (built in previous jobs)
@@ -80,20 +113,36 @@ runs:
         name: IronPyShp_wheel_and_sdist
         path: dist
 
-    - name: Install PyShp from the wheel (built in prev step)
+    - name: Install test deps
+      if: ${{ inputs.python == 'python' }}
+      shell: bash
+      working-directory: ${{ inputs.pyshp_repo_directory }}
+      run: python -m pip install -r requirements.test.txt
+
+    - name: Install IronPyShp from the wheel (built in prev step)
+      if: ${{ inputs.python == 'python' }}
       shell: bash
       working-directory: dist/
       run: |
-        WHEEL_NAME=$(ls pyshp-*py3-none-any.whl)
-        python -m pip install $WHEEL_NAME[test]
+        WHEEL_NAME=$(ls ironpyshp-*py3-none-any.whl)
+        python -m pip install $WHEEL_NAME
+      # python -m pip install $WHEEL_NAME[test]
 
     - name: Show Python and Pytest versions for logs.
+      if: ${{ inputs.python == 'python' }}
       shell: bash
       run: |
         python --version
         python -m pytest --version
 
+    - name: Show Python and Pytest versions for logs.
+      if: ${{ inputs.python == 'ipy' }}
+      shell: bash
+      run: |
+        ipy -V
+
     - name: Run Pytest
+      if: ${{ inputs.python == 'python' }}
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:

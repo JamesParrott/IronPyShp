@@ -37,7 +37,82 @@ jobs:
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
-  test_on_supported_Pythons:
+
+  test_on_IronPython_2_7:
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [
+          # {os: ubuntu-24.04,
+          #  python: ironpython,
+          #  caddy: caddy_2.10.0_linux_amd64.tar.gz,
+          #  windows: no,
+          #  },
+          {os: windows-latest,
+           python: ipy,
+           caddy: caddy_2.10.0_windows_amd64.zip,
+           windows: yes,
+           },
+          # {os: macos-latest,
+          #  python: ironpython,
+          #  caddy: caddy_2.10.0_mac_amd64.tar.gz,
+          #  windows: no,
+          #  },
+        ]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: ./IronPyshp
+
+    # - name: Install IronPython on Ubuntu
+    #   if: ${{ startsWith(matrix.platform.os, 'ubuntu') }}
+    #   shell: bash
+    #   run: |
+    #     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+    #     echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+    #     sudo apt update
+    #     sudo apt install mono-devel
+    #     sudo apt install libmono-system-numerics4.0-cil
+    #     echo $PATH
+      # ipy -V
+      # where ipy
+      # sudo mv IronPython-2.7.11 /opt/ironpython
+      # echo "/opt/ironpython" >> $GITHUB_PATH
+
+    - name: Install IronPython on Windows
+      if: matrix.platform.os == 'windows-latest'
+      run: |
+        choco install ironpython --version=2.7.11 --yes
+        echo "C:\Program Files\IronPython 2.7" >> $env:GITHUB_PATH
+
+    # - name: Install IronPython on macOS
+    #   if: matrix.platform.os == 'macos-latest'
+    #   run: |
+    #     brew install --cask ironpython
+    #     echo "/Applications/IronPython-2.7.11" >> $GITHUB_PATH
+
+    - name: Non-network tests
+      uses: ./IronPyshp/.github/actions/test
+      with:
+        pyshp_repo_directory: ./IronPyshp
+        python: ipy
+
+    # - name: Network tests
+    #   uses: ./IronPyshp/.github/actions/test
+    #   with:
+    #     extra_args: '-m network'
+    #     replace_remote_urls_with_localhost: 'yes'
+    #     # Checkout to ./IronPyshp, as the test job also needs to check out the artefact repo
+    #     pyshp_repo_directory: ./IronPyshp
+    #     python: ipy
+    #     python-version: "2.7"
+    #     caddy-release: ${{ matrix.platform.caddy }}
+    #     on-windows: ${{ matrix.platform.windows }}
+
+
+  test_on_supported_C_Pythons:
     needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
@@ -80,15 +155,16 @@ jobs:
         pyshp_repo_directory: ./IronPyshp
 
   test_on_EOL_Pythons:
+    needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
       matrix:
         python-version: [
-            # "2.7",
-            "3.5",
-            "3.6",
-            "3.7",
-            "3.8",
+            "2.7.18",
+            "3.5.10",
+            "3.6.15",
+            "3.7.17",
+            "3.8.18",
         ]
 
     runs-on: ubuntu-latest

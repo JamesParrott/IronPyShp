@@ -189,7 +189,10 @@ else:
 
     def is_string(v):
         return isinstance(v, basestring)
-
+# Save reference to possibly unordered dict, to
+# instead of dict for isinstance({}, dict) calls
+# after we possibly patch dict = collections.OrderedDict
+_dict = dict
 
 if sys.version_info[0:2] >= (3, 6):
 
@@ -2292,7 +2295,7 @@ class Writer(object):
         if not isinstance(s, Shape):
             if hasattr(s, "__geo_interface__"):
                 s = s.__geo_interface__
-            if isinstance(s, dict):
+            if isinstance(s, _dict):
                 s = Shape._from_geojson(s)
             else:
                 raise Exception(
@@ -2942,6 +2945,12 @@ def _test(args = sys.argv[1:], verbosity = False):
 
     class Py23DocChecker(doctest.OutputChecker):
         def check_output(self, want, got, optionflags):
+            if sys.version_info[0] == 2:
+                got = re.sub("u'(.*?)'", "'\\1'", got)
+                got = re.sub('u"(.*?)"', '"\\1"', got)
+                if IRON_PYTHON:
+                    # Don't fail tests due to negligible floating point differences
+                    got = re.sub(r"\d*\.\d*[90]{7,}\d?", lambda m: str(round(float(m.group(0)),7)), got)
             res = doctest.OutputChecker.check_output(self, want, got, optionflags)
             return res
 
