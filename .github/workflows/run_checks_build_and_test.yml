@@ -65,17 +65,17 @@ jobs:
 
     - uses: actions/checkout@v4
       with:
-        path: ./Pyshp
+        path: ./IronPyshp
 
     - name: Non-network tests
       uses: ./Pyshp/.github/actions/test
       with:
-        pyshp_repo_directory: ./Pyshp
+        pyshp_repo_directory: ./IronPyshp
 
     - name: Network tests
       uses: ./Pyshp/.github/actions/test
       with:
         extra_args: '-m network'
         replace_remote_urls_with_localhost: 'yes'
-        # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
-        pyshp_repo_directory: ./Pyshp
+        # Checkout to ./IronPyShp, as the test job also needs to check out the artefact repo
+        pyshp_repo_directory: ./IronPyshp

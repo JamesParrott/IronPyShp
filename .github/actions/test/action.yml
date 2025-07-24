@@ -23,25 +23,25 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # The PyShp repo is required to already be checked out into pyshp_repo_directory,
+    # The repo is required to already be checked out into pyshp_repo_directory,
     # and the wheel to be tested in ./dist within it.
     # e.g. by the calling workflow using:
     # steps:
     # - uses: actions/checkout@v4
     #   with:
-    #     path: ./Pyshp
+    #     path: ./IronPyshp
     #
     # - name: Build distribution artefacts (wheel and sdist)
-    #   uses: ./Pyshp/.github/actions/build_wheel_and_sdist
+    #   uses: ./IronPyshp/.github/actions/build_wheel_and_sdist
     #
     # and then calling this Action with:
     #
     # - name: Run tests
-    #   uses: ./Pyshp/.github/actions/test
+    #   uses: ./IronPyshp/.github/actions/test
     #   with:
     #     extra_args: ""
     #     replace_remote_urls_with_localhost: 'yes'
-    #     pyshp_repo_directory: ./Pyshp
+    #     pyshp_repo_directory: ./IronPyshp
 
     # The Python to be tested with is required to already be setup,
     # with "python" and "pip" on the system Path
@@ -77,7 +77,7 @@ runs:
     - name: Download wheel and sdist (built in previous jobs)
       uses: actions/download-artifact@v4
       with:
-        name: PyShp_wheel_and_sdist
+        name: IronPyShp_wheel_and_sdist
         path: dist
 
     - name: Install PyShp from the wheel (built in prev step)
