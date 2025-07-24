@@ -102,13 +102,13 @@ runs:
         path: dist
 
     - name: Install test deps
-      if: ${{ inputs.python == 'python' }} 
+      if: ${{ inputs.python == 'python' }}
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       run: ${{ inputs.python }} -m pip install -r requirements.test.txt
 
     - name: Install IronPyShp from the wheel (built in prev step)
-      if: ${{ inputs.python == 'python' }} 
+      if: ${{ inputs.python == 'python' }}
       shell: bash
       working-directory: dist/
       run: |
@@ -123,7 +123,7 @@ runs:
         python -m pytest --version
 
     - name: Run Pytest
-      if: ${{ inputs.python == 'python' }} 
+      if: ${{ inputs.python == 'python' }}
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:
