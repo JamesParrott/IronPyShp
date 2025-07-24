@@ -23,7 +23,7 @@ inputs:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
     required: false
     default: '.'
-  on_windows:
+  on-windows:
     default: "no"
 
 
@@ -75,7 +75,7 @@ runs:
         sleep 4  # give server time to start
 
     - name: Download and unzip Caddy binary
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows != "yes"}}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows != 'yes' }}
       working-directory: .
       shell: bash
       run: |
@@ -83,7 +83,7 @@ runs:
         tar -xzf caddy_archive
 
     - name: Download and unzip Caddy binary
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows == "yes"}}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows == 'yes' }}
       working-directory: .
       shell: bash
       run: |
