@@ -43,7 +43,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest, macos-latest]
+        platform: [
+          {os: ubuntu-24.04,
+           caddy: caddy_2.10.0_linux_amd64.tar.gz}, 
+          {os: windows-latest,
+           caddy: caddy_2.10.0_windows_amd64.zip },
+          {os: macos-latest,
+           caddy: caddy_2.10.0_mac_amd64.tar.gz},
+        ]
 
     steps:
     - uses: actions/checkout@v4
@@ -51,10 +58,9 @@ jobs:
         path: ./IronPyshp
 
     - name: Install IronPython on Ubuntu
-      if: matrix.os == 'ubuntu-latest'
+      if: ${{ startsWith(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update
-        sudo apt-get install -y unzip
         curl -L -o ironpython.tar.gz https://github.com/IronLanguages/ironpython2/releases/download/ipy-2.7.11/IronPython-2.7.11.tar.gz
         tar -xzf ironpython.tar.gz
         sudo mv IronPython-2.7.11 /opt/ironpython
@@ -87,6 +93,7 @@ jobs:
         pyshp_repo_directory: ./IronPyshp
         python: ipy
         python-version: "2.7"
+        caddy-release: caddy_2.10.0_mac_amd64
 
 
   test_on_supported_C_Pythons:

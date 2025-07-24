@@ -17,10 +17,14 @@ inputs:
     description: yes or no.  Test loading shapefiles from a url, without overloading an external server from 30 parallel workflows.
     default: 'no'
     required: false
+  caddy-release:
+    default: caddy_2.10.0_linux_amd64
   pyshp_repo_directory:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
     required: false
     default: '.'
+  on_windows:
+    default: "no"
 
 
 
@@ -71,12 +75,20 @@ runs:
         sleep 4  # give server time to start
 
     - name: Download and unzip Caddy binary
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7')}}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows != "yes"}}
       working-directory: .
       shell: bash
       run: |
-        curl -L https://github.com/caddyserver/caddy/releases/download/v2.10.0/caddy_2.10.0_linux_amd64.tar.gz --output caddy.tar.gz
-        tar -xzf caddy.tar.gz
+        curl -L https://github.com/caddyserver/caddy/releases/download/v2.10.0/${{ inputs.caddy-release }} --output caddy_archive
+        tar -xzf caddy_archive
+
+    - name: Download and unzip Caddy binary
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7') && inputs.on-windows == "yes"}}
+      working-directory: .
+      shell: bash
+      run: |
+        curl -L https://github.com/caddyserver/caddy/releases/download/v2.10.0/${{ inputs.caddy-release }} --output caddy_archive
+        unzip caddy_archive
 
     - name: Serve shapefiles and zip file artefacts on localhost using Caddy
       if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && startsWith(inputs.python-version, '2.7')}}
