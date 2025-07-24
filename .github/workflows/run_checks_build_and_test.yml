@@ -76,7 +76,7 @@ jobs:
       uses: ./IronPyshp/.github/actions/test
       with:
         pyshp_repo_directory: ./IronPyshp
-        python: ironpython
+        python: ipy
 
     - name: Network tests
       uses: ./IronPyshp/.github/actions/test
@@ -85,7 +85,7 @@ jobs:
         replace_remote_urls_with_localhost: 'yes'
         # Checkout to ./IronPyshp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./IronPyshp
-        python: ironpython
+        python: ipy
         python-version: "2.7"
 
 
