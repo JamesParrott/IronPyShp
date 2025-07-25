@@ -21,6 +21,7 @@ import time
 import zipfile
 from collections.abc import Collection
 from datetime import date
+import pathlib
 from struct import Struct, calcsize, error, pack, unpack
 from typing import IO, Any, Iterable, Iterator, Optional, Reversible, TypedDict, Union
 from urllib.error import HTTPError
@@ -2830,9 +2831,27 @@ class Writer:
 
 
 # Begin Testing
+def _find_readme(
+    readme_name: Union[str, pathlib.Path] ="README.md",
+    ) -> pathlib.Path:
+
+    for parent in pathlib.Path(__file__).parents:
+        candidate_readme = parent / readme_name
+        if candidate_readme.is_file():
+            return candidate_readme
+    
+    raise Exception(
+        f"Could not find: {readme_name} in any parent directory. "
+        "Try running the doctests in a local clone of the PyShp repo. "
+    )
+
+
 def _get_doctests() -> doctest.DocTest:
+
+    readme = _find_readme()
+
     # run tests
-    with open("README.md", "rb") as fobj:
+    with readme.open("rb") as fobj:
         tests = doctest.DocTestParser().get_doctest(
             string=fobj.read().decode("utf8").replace("\r\n", "\n"),
             globs={},
