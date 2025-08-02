@@ -680,7 +680,6 @@ def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
 
 
 class Shape:
-
     def __init__(
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),

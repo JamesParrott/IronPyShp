@@ -483,17 +483,12 @@ shapeType Point do not have a bounding box 'bbox'.
 	...         name
 	'bbox'
 	'from_byte_stream'
-	'm'
-	'mbox'
 	'oid'
-	'partTypes'
 	'parts'
 	'points'
 	'shapeType'
 	'shapeTypeName'
 	'write_to_byte_stream'
-	'z'
-	'zbox'
 
   * `oid`: The shape's index position in the original shapefile.
 
