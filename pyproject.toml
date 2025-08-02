@@ -47,6 +47,12 @@ sources = {"src" = ""}  # move from "src" directory for wheel
 [tool.hatch.version]
 path = "src/shapefile.py"
 
+[tool.pytest.ini_options]
+markers = [
+    "network: marks tests requiring network access",
+    "slow: marks other tests that cause bottlenecks",
+]
+
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [
