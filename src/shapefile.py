@@ -663,7 +663,6 @@ class _NoShapeTypeSentinel:
 
 
 class Shape:
-    shapeType: int = NULL
     _shapeTypes = frozenset(
         [
             NULL,
