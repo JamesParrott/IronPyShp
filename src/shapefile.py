@@ -686,10 +686,11 @@ class Shape:
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
         points: Optional[PointsT] = None,
-        parts: Optional[Sequence[int]] = None,
+        parts: Optional[list[int]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
         *,
+        partIndexes: Optional[Sequence[int]] = None,
         m: Optional[Sequence[Optional[float]]] = None,
         z: Optional[Sequence[float]] = None,
         bbox: Optional[BBox] = None,
@@ -714,13 +715,44 @@ class Shape:
         else:
             class_name = self.__class__.__name__
             self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
-
-        self.points: PointsT = points or []
-        self.parts: Sequence[int] = parts or []
-        if partTypes:
+        
+        if partTypes is not None:
             self.partTypes = partTypes
+        
+        default_points = []
+        default_parts_indices = []
 
-        # and a dict to silently record any errors encountered
+        # Make sure polygon rings (parts) are closed
+        if parts is not None:
+            if self.shapeType in Polygon_shapeTypes:
+                parts = list(parts)
+                self._ensure_polygon_rings_closed(parts)
+
+            default_points, default_parts_indices = self._points_and_parts_indexes_from_shapeparts(parts)
+        elif points and self.shapeType in _CanHaveBBox_shapeTypes:
+            # TODO:  Raise issue.
+            # This ensures Polylines, Polygons and Multipatches with no part information are a single
+            # Polyline, Polygon or Multipatch respectively. 
+            #
+            # However this also allows MultiPoints shapes to have a single part index 0 as 
+            # documented in README.md,also when set from points
+            # (even though this is just an artefact of initialising them as a length-1 nested 
+            # list of points via _points_and_parts_indexes_from_shapeparts).
+            #
+            # Alternatively single points could be given parts = [0] too, as they do if formed
+            # _from_geojson.
+            default_parts_indices = [0] 
+            
+        self.points: PointsT = points or default_points
+
+        # Historically Shape.parts is not simply the arg parts,
+        # provided to the Shape constructor, 
+        # (it's the indexes of its contents in self.points).  Should the user
+        # so wish, and for testing, we now allow self.parts to be overridden 
+        # for completness, but by partIndexes not parts (that's taken). 
+        self.parts: Sequence[int] = partIndexes or default_parts_indices
+
+        # and a dict to silently record any errors encountered in GeoJSON
         self._errors: dict[str, int] = {}
 
         # add oid
@@ -740,6 +772,41 @@ class Shape:
 
         if zbox is not None:
             self.zbox: ZBox = zbox
+
+    @staticmethod
+    def _ensure_polygon_rings_closed(
+        parts: list[PointsT], # Mutated
+    ) -> None:
+        for part in parts:
+            if part[0] != part[-1]:
+                part.append(part[0])
+
+    @staticmethod
+    def _points_and_parts_indexes_from_shapeparts(
+        parts: list[PointsT]
+    ) -> tuple[PointsT, list[int]]:
+    
+        # Intended for Union[Polyline, Polygon, MultiPoint, MultiPatch]
+        """ From a list of parts (each part a list of points) return
+        a flattened list of points, and a list of indexes into that 
+        flattened list corresponding to the start of each part.
+
+        Internal method for both multipoints (formed entirely by a single part), 
+        and shapes that have multiple collections of points (each one 
+        a part): (poly)lines, polygons, and multipatchs.
+        """
+        part_indexes = []
+        points = []
+
+        for part in parts:
+            # set part index position
+            part_indexes.append(len(points))
+            points.extend(part)
+
+        return points, part_indexes
+
+        
+
 
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
@@ -944,10 +1011,9 @@ class NullShape(Shape):
     # Repeated for clarity.
     def __init__(
         self,
-        *args,
-        **kwargs,
+        oid: Optional[int] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(self, shapeType = NULL, oid = oid)
 
     @classmethod
     def from_byte_stream(
@@ -996,13 +1062,6 @@ class _CanHaveBBox(Shape):
     fact that this mixin applies to all the shapes that are
     not a single point.
     """
-
-    def __init__(
-        self,
-        *args,
-        **kwargs,
-    ):
-        Shape.__init__(self, *args, **kwargs)
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
         self.bbox = unpack("<4d", b_io.read(32))
@@ -1169,12 +1228,6 @@ class _CanHaveParts(_CanHaveBBox):
     # The parts attribute is initialised by
     # the base class Shape's __init__, to parts or [].
     # "Can Have Parts" should be read as "Can Have non-empty parts".
-    def __init__(
-        self,
-        *args,
-        **kwargs,
-    ):
-        Shape.__init__(self, *args, **kwargs)
 
     @staticmethod
     def _get_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
@@ -1203,10 +1256,11 @@ class Point(Shape):
     # bbox is still used to filter out points).
     def __init__(
         self,
-        *args,
+        x: float,
+        y: float,
         **kwargs,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(self, points=[(x, y)], **kwargs)
 
     def _set_single_point_z_from_byte_stream(self, b_io: ReadableBinStream):
         pass
@@ -1293,10 +1347,19 @@ Polyline_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
 class Polyline(_CanHaveParts):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            bbox=bbox,
+            )
 
 
 Polygon_shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
@@ -1305,10 +1368,19 @@ Polygon_shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
 class Polygon(_CanHaveParts):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            bbox=bbox,
+            )
 
 
 MultiPoint_shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
@@ -1317,10 +1389,17 @@ MultiPoint_shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
 class MultiPoint(_CanHaveBBox):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        points: Optional[PointsT] = None,
+        *
+        parts: Optional[list[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            bbox=bbox,
+            )
 
 
 # Not a PointM or a PointZ
@@ -1339,10 +1418,6 @@ _HasM_shapeTypes = frozenset(
 
 class _HasM(_CanHaveBBox):
     m: Sequence[Optional[float]]
-
-    def __init__(self, *args, **kwargs):
-        Shape.__init__(self, *args, **kwargs)
-        self.m = []
 
     def _set_ms_from_byte_stream(
         self, b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
@@ -1415,10 +1490,6 @@ _HasZ_shapeTypes = frozenset(
 class _HasZ(_CanHaveBBox):
     z: Sequence[float]
 
-    def __init__(self, *args, **kwargs):
-        Shape.__init__(self, *args, **kwargs)
-        self.z = []
-
     def _set_zs_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
         __zmin, __zmax = unpack("<2d", b_io.read(16))
         self.z = _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
@@ -1461,10 +1532,23 @@ MultiPatch_shapeTypes = frozenset([MULTIPATCH])
 class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *,
+        z: Optional[list[float]] = None,
+        m: Optional[list[Optional[float]]] = None,
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            z=z,
+            m=m,
+            bbox=bbox,
+            )
 
     def _set_part_types_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
         self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
@@ -1480,10 +1564,11 @@ PointM_shapeTypes = frozenset([POINTM, POINTZ])
 class PointM(Point):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        x: float,
+        y: float,
+        m: Optional[float],
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(self, points=[(x, y)], m=(m,))
 
     # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
     # PyShp encodes None m values as NODATA
@@ -1549,10 +1634,21 @@ PolylineM_shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
 class PolylineM(Polyline, _HasM):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *,
+        m: Optional[Sequence[Optional[float]]] = None,
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            m=m,
+            bbox=bbox,
+            )
 
 
 PolygonM_shapeTypes = frozenset([POLYGONM, POLYGONZ])
@@ -1561,10 +1657,21 @@ PolygonM_shapeTypes = frozenset([POLYGONM, POLYGONZ])
 class PolygonM(Polygon, _HasM):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *,
+        m: Optional[Sequence[Optional[float]]] = None,
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            m=m,
+            bbox=bbox,
+            )
 
 
 MultiPointM_shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
@@ -1573,10 +1680,18 @@ MultiPointM_shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
 class MultiPointM(MultiPoint, _HasM):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        points: Optional[PointsT] = None,
+        *,
+        m: Optional[Sequence[Optional[float]]] = None,
+        parts: Optional[list[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            bbox=bbox,
+            )
 
 
 PointZ_shapeTypes = frozenset([POINTZ])
@@ -1585,10 +1700,13 @@ PointZ_shapeTypes = frozenset([POINTZ])
 class PointZ(PointM):
     def __init__(
         self,
-        *args,
+        x: float,
+        y: float,
+        z: float = 0.0,
+        m: Optional[float] = None,
         **kwargs,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(self, points = [(x,y)], z=(z,), m=(m,), **kwargs)
 
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
@@ -1631,22 +1749,49 @@ PolylineZ_shapeTypes = frozenset([POLYLINEZ])
 class PolylineZ(PolylineM, _HasZ):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *,
+        z: Optional[list[float]] = None,
+        m: Optional[list[Optional[float]]] = None,
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            z=z,
+            m=m,
+            bbox=bbox,
+            )
 
 
 PolygonZ_shapeTypes = frozenset([POLYGONZ])
 
 
 class PolygonZ(PolygonM, _HasZ):
+
     def __init__(
         self,
-        *args,
-        **kwargs,
+        parts: Optional[list[int]] = None,
+        *,
+        z: Optional[list[float]] = None,
+        m: Optional[list[Optional[float]]] = None,
+        points: Optional[PointsT] = None,
+        partIndexes: Optional[Sequence[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            partIndexes = partIndexes,
+            z=z,
+            m=m,
+            bbox=bbox,
+            )
 
 
 MultiPointZ_shapeTypes = frozenset([MULTIPOINTZ])
@@ -1655,10 +1800,21 @@ MultiPointZ_shapeTypes = frozenset([MULTIPOINTZ])
 class MultiPointZ(MultiPointM, _HasZ):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        points: Optional[PointsT] = None,
+        *,
+        z: Optional[list[float]] = None,
+        m: Optional[Sequence[Optional[float]]] = None,
+        parts: Optional[list[int]] = None,
+        bbox: Optional[BBox] = None,
     ):
-        Shape.__init__(self, *args, **kwargs)
+        Shape.__init__(
+            self,
+            points=points,
+            parts = parts,
+            bbox=bbox,
+            z=z,
+            m=m,
+            )
 
 
 SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]]] = {
@@ -3536,15 +3692,13 @@ class Writer:
 
     def point(self, x: float, y: float) -> None:
         """Creates a POINT shape."""
-        pointShape = Point()
-        pointShape.points.append((x, y))
+        pointShape = Point(x, y)
         self.shape(pointShape)
 
     def pointm(self, x: float, y: float, m: Optional[float] = None) -> None:
         """Creates a POINTM shape.
         If the m (measure) value is not set, it defaults to NoData."""
-        pointShape = PointM()
-        pointShape.points.append((x, y, m))
+        pointShape = PointM(x, y, m)
         self.shape(pointShape)
 
     def pointz(
@@ -3553,22 +3707,23 @@ class Writer:
         """Creates a POINTZ shape.
         If the z (elevation) value is not set, it defaults to 0.
         If the m (measure) value is not set, it defaults to NoData."""
-        pointShape = PointZ()
-        pointShape.points.append((x, y, z, m))
+        pointShape = PointZ(x, y, z, m)
         self.shape(pointShape)
 
     def multipoint(self, points: PointsT) -> None:
         """Creates a MULTIPOINT shape.
         Points is a list of xy values."""
         # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=[points], polyShape=MultiPoint())
+        shape = MultiPoint(parts=[points])
+        self.shape(shape)
 
     def multipointm(self, points: PointsT) -> None:
         """Creates a MULTIPOINTM shape.
         Points is a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=[points], polyShape=MultiPointM())
+        shape = MultiPointM(parts=[points])
+        self.shape(shape)
 
     def multipointz(self, points: PointsT) -> None:
         """Creates a MULTIPOINTZ shape.
@@ -3576,32 +3731,37 @@ class Writer:
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=[points], polyShape=MultiPointZ())
+        shape = MultiPointZ(parts=[points])
+        self.shape(shape)
 
     def line(self, lines: list[PointsT]) -> None:
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
-        self._shapeparts(parts=lines, polyShape=Polyline())
+        shape = Polyline(parts=lines)
+        self.shape(shape)
 
     def linem(self, lines: list[PointsT]) -> None:
         """Creates a POLYLINEM shape.
         Lines is a collection of lines, each made up of a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        self._shapeparts(parts=lines, polyShape=PolylineM())
+        shape = PolylineM(parts=lines)
+        self.shape(shape)
 
     def linez(self, lines: list[PointsT]) -> None:
         """Creates a POLYLINEZ shape.
         Lines is a collection of lines, each made up of a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        self._shapeparts(parts=lines, polyShape=PolylineZ())
+        shape = PolylineZ(parts=lines)
+        self.shape(shape)
 
     def poly(self, polys: list[PointsT]) -> None:
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
         If some of the polygons are holes, these must run in a counterclockwise direction."""
-        self._shapeparts(parts=polys, polyShape=Polygon())
+        shape = Polygon(parts=polys)
+        self.shape(shape)
 
     def polym(self, polys: list[PointsT]) -> None:
         """Creates a POLYGONM shape.
@@ -3609,7 +3769,8 @@ class Writer:
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
         If some of the polygons are holes, these must run in a counterclockwise direction.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        self._shapeparts(parts=polys, polyShape=PolygonM())
+        shape = PolygonM(parts=polys)
+        self.shape(shape)
 
     def polyz(self, polys: list[PointsT]) -> None:
         """Creates a POLYGONZ shape.
@@ -3618,7 +3779,8 @@ class Writer:
         If some of the polygons are holes, these must run in a counterclockwise direction.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        self._shapeparts(parts=polys, polyShape=PolygonZ())
+        shape = PolygonZ(parts=polys)
+        self.shape(shape)
 
     def multipatch(self, parts: list[PointsT], partTypes: list[int]) -> None:
         """Creates a MULTIPATCH shape.
@@ -3628,52 +3790,9 @@ class Writer:
         TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        polyShape = MultiPatch()
-        polyShape.parts = []
-        polyShape.points = []
-        for part in parts:
-            # set part index position
-            polyShape.parts.append(len(polyShape.points))
-            # add points
-            # for point in part:
-            #     # Ensure point is list
-            #     if not isinstance(point, list):
-            #         point = list(point)
-            #     polyShape.points.append(point)
-            polyShape.points.extend(part)
-        polyShape.partTypes = partTypes
-        # write the shape
-        self.shape(polyShape)
+        shape = MultiPatch(parts = parts, partTypes=partTypes)
+        self.shape(shape)
 
-    def _shapeparts(
-        self, parts: list[PointsT], polyShape: Union[Polyline, Polygon, MultiPoint]
-    ) -> None:
-        """Internal method for adding a shape that has multiple collections of points (parts):
-        lines, polygons, and multipoint shapes.
-        """
-        polyShape.parts = []
-        polyShape.points = []
-        # Make sure polygon rings (parts) are closed
-
-        # if shapeType in (5, 15, 25, 31):
-        # This method is never actually called on a MultiPatch
-        # so we omit its shapeType (31) for efficiency
-        if polyShape.shapeType in Polygon_shapeTypes:
-            for part in parts:
-                if part[0] != part[-1]:
-                    part.append(part[0])
-        # Add points and part indexes
-        for part in parts:
-            # set part index position
-            polyShape.parts.append(len(polyShape.points))
-            # add points
-            # for point in part:
-            #     # Ensure point is list
-            #     point_list = list(point)
-            #     polyShape.points.append(point_list)
-            polyShape.points.extend(part)
-        # write the shape
-        self.shape(polyShape)
 
     def field(
         # Types of args should match *Field
