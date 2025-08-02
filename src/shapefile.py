@@ -710,7 +710,6 @@ class Shape:
         # self.m: Optional[list[Optional[float]]] = None
         # self.bbox: Optional[_Array[float]] = None
 
-
     def __init__(
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
@@ -755,7 +754,6 @@ class Shape:
             partTypes=partTypes,
             oid=oid,
         )
-
 
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
