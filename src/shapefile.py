@@ -772,7 +772,7 @@ class Shape:
         # add oid
         self.__oid: int = -1 if oid is None else oid
 
-        if m is not None:
+        if m:
             self.m: Sequence[Optional[float]] = m
         elif self.shapeType in _HasM_shapeTypes:
             mpos = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
@@ -783,7 +783,7 @@ class Shape:
             point_m_z = cast(Union[PointMT, PointZT], self.points[0])
             self.m = (_m_from_point(point_m_z, mpos),)
 
-        if z is not None:
+        if z:
             self.z: Sequence[float] = z
         elif self.shapeType in _HasZ_shapeTypes:
             points_z = cast(list[PointZT], self.points)
@@ -1496,21 +1496,11 @@ class _HasM(_CanHaveBBox):
                 f"Failed to write measure extremes for record {i}. Expected floats"
             )
         try:
-            if getattr(s, "m", False):
-                # if m values are stored in attribute
-                ms = cast(_HasM, s).m
-
-            else:
-                # if m values are stored as 3rd/4th dimension
-                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-                mpos = 3 if s.shapeType in _HasZ_shapeTypes else 2
-                points = cast(Union[list[PointMT], list[PointZT]], s.points)
-                ms = list(_ms_from_points(points, mpos))
+            ms = cast(_HasM, s).m
 
             ms_to_encode = [m if m is not None else NODATA for m in ms]
 
             num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
-
         except error:
             raise ShapefileException(
                 f"Failed to write measure values for record {i}. Expected floats"
@@ -1553,16 +1543,7 @@ class _HasZ(_CanHaveBBox):
                 f"Failed to write elevation extremes for record {i}. Expected floats."
             )
         try:
-            if getattr(s, "z", False):
-                # if z values are stored in attribute
-                zs = cast(_HasZ, s).z
-            else:
-                # if z values are stored as 3rd dimension
-                # zs = [cast(float, p[2]) if len(p) > 2 else 0 for p in s.points]
-                points = cast(list[PointZT], s.points)
-
-                zs = list(_zs_from_points(points))
-
+            zs = cast(_HasZ, s).z
             num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
         except error:
             raise ShapefileException(
@@ -1649,43 +1630,15 @@ class PointM(Point):
     def _write_single_point_m_to_byte_stream(
         b_io: WriteableBinStream, s: Shape, i: int
     ) -> int:
-        # Write a single M value
+        try:
+            s = cast(_HasM, s)
+            m = s.m[0] if s.m else None
+        except error:
+            raise ShapefileException(
+                f"Failed to write measure value for record {i}. Expected floats."
+            )
+
         # Note: missing m values are autoset to NODATA.
-
-        if getattr(s, "m", False):
-            # if m values are stored in attribute
-            try:
-                # if not s.m or s.m[0] is None:
-                #     s.m = (NODATA,)
-                # m = s.m[0]
-                s = cast(_HasM, s)
-                m = s.m[0] if s.m else None
-            except error:
-                raise ShapefileException(
-                    f"Failed to write measure value for record {i}. Expected floats."
-                )
-        else:
-            # if m values are stored as 3rd/4th dimension
-            # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-            try:
-                mpos = 3 if s.shapeType == POINTZ else 2
-                point = cast(Union[PointMT, PointZT], s.points[0])
-                m_pt = _m_from_point(point, mpos)
-                m = m_pt if m_pt is not None else None
-                # if len(s.points[0]) < mpos + 1:
-                #     # s.points[0].append(NODATA)
-                #     m = NODATA
-                # elif s.points[0][mpos] is None:
-                #     # s.points[0][mpos] = NODATA
-                #     m = NODATA
-                # else:
-                #     m = cast(float, s.points[0][mpos])
-
-            except error:
-                raise ShapefileException(
-                    f"Failed to write measure value for record {i}. Expected floats."
-                )
-
         m_to_encode = m if m is not None else NODATA
 
         return b_io.write(pack("<1d", m_to_encode))
@@ -1817,26 +1770,14 @@ class PointZ(PointM):
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         z: float = 0.0
         # then write value
-        if hasattr(s, "z"):
-            # if z values are stored in attribute
-            try:
-                if s.z:
-                    z = s.z[0]
-            except error:
-                raise ShapefileException(
-                    f"Failed to write elevation value for record {i}. Expected floats."
-                )
-        else:
-            # if z values are stored as 3rd dimension
-            try:
-                point = cast(PointZT, s.points[0])
-                z = _z_from_point(point)
-                # if len(s.points[0]) >= 3 and s.points[0][2] is not None:
-                #     z = s.points[0][2]
-            except error:
-                raise ShapefileException(
-                    f"Failed to write elevation value for record {i}. Expected floats."
-                )
+
+        try:
+            if s.z:
+                z = s.z[0]
+        except error:
+            raise ShapefileException(
+                f"Failed to write elevation value for record {i}. Expected floats."
+            )
 
         return b_io.write(pack("<d", z))
 
