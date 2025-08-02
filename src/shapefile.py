@@ -680,6 +680,37 @@ class Shape:
             "bbox",
         ]
 
+    def __initialise_attributes__(
+        self,
+        shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
+        points: Optional[PointsT] = None,
+        parts: Optional[Sequence[int]] = None,
+        partTypes: Optional[Sequence[int]] = None,
+        oid: Optional[int] = None,
+    ) -> None:
+        # Preserve previous behaviour for anyone who set self.shapeType = None
+        if not isinstance(shapeType, _NoShapeTypeSentinel):
+            self.shapeType = shapeType
+        else:
+            class_name = self.__class__.__name__
+            self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
+
+        self.points: PointsT = points or []
+        self.parts: Sequence[int] = parts or []
+        if partTypes:
+            self.partTypes = partTypes
+
+        # and a dict to silently record any errors encountered
+        self._errors: dict[str, int] = {}
+
+        # add oid
+        self.__oid: int = -1 if oid is None else oid
+
+        # self.z: Optional[Union[list[Optional[float]], _Array[float]]] = None
+        # self.m: Optional[list[Optional[float]]] = None
+        # self.bbox: Optional[_Array[float]] = None
+
+
     def __init__(
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
@@ -717,30 +748,14 @@ class Shape:
                 MULTIPATCH,
             ]
         )
-        # Preserve previous behaviour for anyone who set self.shapeType = None
-        if not isinstance(shapeType, _NoShapeTypeSentinel):
-            self.shapeType = shapeType
-        else:
-            class_name = self.__class__.__name__
-            self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
+        self.__initialise_attributes__(
+            shapeType=shapeType,
+            points=points,
+            parts=parts,
+            partTypes=partTypes,
+            oid=oid,
+        )
 
-        self.points: PointsT = points or []
-        self.parts: Sequence[int] = parts or []
-        if partTypes:
-            self.partTypes = partTypes
-
-        # and a dict to silently record any errors encountered
-        self._errors: dict[str, int] = {}
-
-        # add oid
-        if oid is not None:
-            self.__oid = oid
-        else:
-            self.__oid = -1
-
-        # self.z: Optional[Union[list[Optional[float]], _Array[float]]] = None
-        # self.m: Optional[list[Optional[float]]] = None
-        # self.bbox: Optional[_Array[float]] = None
 
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
@@ -1305,7 +1320,7 @@ class Polyline(_CanHaveParts):
         self._shapeTypes = Polyline_shapeTypes
 
 
-Polygon_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
+Polygon_shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
 
 
 class Polygon(_CanHaveParts):
