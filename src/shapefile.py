@@ -145,7 +145,7 @@ ZBox = tuple[float, float]
 
 
 class WriteableBinStream(Protocol):
-    def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
+    def write(self, b: bytes): ...
 
 
 class ReadableBinStream(Protocol):
@@ -153,20 +153,20 @@ class ReadableBinStream(Protocol):
 
 
 class WriteSeekableBinStream(Protocol):
-    def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
-    def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
+    def write(self, b: bytes): ...
+    def seek(self, offset: int, whence: int = 0): ...
     def tell(self): ...
 
 
 class ReadSeekableBinStream(Protocol):
-    def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
+    def seek(self, offset: int, whence: int = 0): ...
     def tell(self): ...
     def read(self, size: int = -1): ...
 
 
 class ReadWriteSeekableBinStream(Protocol):
-    def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
-    def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
+    def write(self, b: bytes): ...
+    def seek(self, offset: int, whence: int = 0): ...
     def tell(self): ...
     def read(self, size: int = -1): ...
 
@@ -795,8 +795,9 @@ class Shape:
                 coordinates.append(list(self.points[ps:part]))
                 ps = part
 
-            # assert len(self.parts) >1 # so disable pylint rule
-            coordinates.append(list(self.points[part:]))  # pylint: disable=undefined-loop-variable
+            # assert len(self.parts) > 1
+            # from previous if len(self.parts) checks so part is defined
+            coordinates.append(list(self.points[part:]))
             return {"type": "MultiLineString", "coordinates": coordinates}
 
         if self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
@@ -946,7 +947,6 @@ def compatible_with(s: Shape, cls: type[S]) -> TypeIs[S]:
     return s.shapeType in cls._shapeTypes
 
 
-# pylint: disable=unused-argument
 # Need unused arguments to keep the same call signature for
 # different implementations of from_byte_stream and write_to_byte_stream
 class NullShape(Shape):
@@ -1258,9 +1258,6 @@ class Point(Shape):
         return n
 
 
-# pylint: enable=unused-argument
-
-
 class Polyline(_CanHaveParts):
     shapeType = POLYLINE
     _shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
@@ -1369,7 +1366,7 @@ class _HasZ(_CanHaveBBox):
         super().__init__(*args, **kwargs)
 
     def _set_zs_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
-        __zmin, __zmax = unpack("<2d", b_io.read(16))  # pylint: disable=unused-private-member
+        __zmin, __zmax = unpack("<2d", b_io.read(16))
         self.z = _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
     @staticmethod
@@ -1821,7 +1818,6 @@ class Reader:
         assert ext in self.CONSTITUENT_FILE_EXTS
 
     def __init__(
-        # pylint: disable=unused-argument
         self,
         shapefile_path: Union[str, os.PathLike] = "",
         /,
@@ -1833,7 +1829,6 @@ class Reader:
         dbf: Optional[BinaryFileT] = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs,
-        # pylint: enable=unused-argument
     ):
         self.shp = None
         self.shx = None
@@ -1932,7 +1927,7 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except:  # pylint: disable=bare-except  # noqa: E722
+                    except:  # noqa: E722
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -2780,7 +2775,7 @@ class Reader:
                 yield ShapeRecord(shape=shape, record=record)
         else:
             # only iterate where shape.bbox overlaps with the given bbox
-            # TODO: internal __record method should be faster but would have to pylint: disable=fixme
+            # TODO: internal __record method should be faster but would have to
             # make sure to seek to correct file location...
 
             # fieldTuples,recLookup,recStruct = self.__recordFields(fields)
@@ -2796,7 +2791,6 @@ class Writer:
 
     W = TypeVar("W", bound=WriteSeekableBinStream)
 
-    # pylint: disable=unused-argument
     def __init__(
         self,
         target: Union[str, os.PathLike, None] = None,
@@ -2810,7 +2804,6 @@ class Writer:
         dbf: Optional[WriteSeekableBinStream] = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs,
-        # pylint: enable=unused-argument
     ):
         self.target = target
         self.autoBalance = autoBalance
@@ -3611,7 +3604,7 @@ def _filter_network_doctests(
 
     examples_it = iter(examples)
 
-    yield next(examples_it)  # pylint: disable=stop-iteration-return
+    yield next(examples_it)
 
     for example in examples_it:
         # Track variables in doctest shell sessions defined from commands
