@@ -663,24 +663,9 @@ class _NoShapeTypeSentinel:
 
 
 class Shape:
-    _shapeTypes = frozenset(
-        [
-            NULL,
-            POINT,
-            POINTM,
-            POINTZ,
-            POLYLINE,
-            POLYLINEM,
-            POLYLINEZ,
-            POLYGON,
-            POLYGONM,
-            POLYGONZ,
-            MULTIPOINT,
-            MULTIPOINTM,
-            MULTIPOINTZ,
-            MULTIPATCH,
-        ]
-    )
+    __slots__ = ['_shapeTypes', '__oid','shapeType','points','parts',
+    'partTypes', '_errors', 'm', 'z','bbox']
+
 
     def __init__(
         self,
@@ -701,6 +686,24 @@ class Shape:
         list of shapes. For MultiPatch geometry, partTypes designates
         the patch type of each of the parts.
         """
+        self._shapeTypes = frozenset(
+        [
+            NULL,
+            POINT,
+            POINTM,
+            POINTZ,
+            POLYLINE,
+            POLYLINEM,
+            POLYLINEZ,
+            POLYGON,
+            POLYGONM,
+            POLYGONZ,
+            MULTIPOINT,
+            MULTIPOINTM,
+            MULTIPOINTZ,
+            MULTIPATCH,
+        ]
+    )
         # Preserve previous behaviour for anyone who set self.shapeType = None
         self.shapeType = NULL if isinstance(shapeType, _NoShapeTypeSentinel) else shapeType
         self.points: PointsT = points or []
