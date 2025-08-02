@@ -45,7 +45,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from typing_extensions import Never, NotRequired, Self, TypeIs
+from typing_extensions import Never, NotRequired, Self
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -181,9 +181,7 @@ class FieldType:
         "L",
         "M",
         "N",
-    }  
-
-
+    }
 
 
 FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
@@ -663,14 +661,24 @@ class _NoShapeTypeSentinel:
     called Shape(shapeType=None).
     """
 
-SHAPE_SLOTS= not bool(os.getenv('PYSHP_NO_SHAPE_SLOTS'))
+
+SHAPE_SLOTS = not bool(os.getenv("PYSHP_NO_SHAPE_SLOTS"))
 
 
 class Shape:
     if SHAPE_SLOTS:
-        __slots__ = ['_shapeTypes', '__oid','shapeType','points','parts',
-        'partTypes', '_errors', 'm', 'z','bbox']
-
+        __slots__ = [
+            "_shapeTypes",
+            "__oid",
+            "shapeType",
+            "points",
+            "parts",
+            "partTypes",
+            "_errors",
+            "m",
+            "z",
+            "bbox",
+        ]
 
     def __init__(
         self,
@@ -692,22 +700,23 @@ class Shape:
         the patch type of each of the parts.
         """
         self._shapeTypes = frozenset(
-        [
-            NULL,
-            POINT,
-            POINTM,
-            POINTZ,
-            POLYLINE,
-            POLYLINEM,
-            POLYLINEZ,
-            POLYGON,
-            POLYGONM,
-            POLYGONZ,
-            MULTIPOINT,
-            MULTIPOINTM,
-            MULTIPOINTZ,
-            MULTIPATCH,
-        ])
+            [
+                NULL,
+                POINT,
+                POINTM,
+                POINTZ,
+                POLYLINE,
+                POLYLINEM,
+                POLYLINEZ,
+                POLYGON,
+                POLYGONM,
+                POLYGONZ,
+                MULTIPOINT,
+                MULTIPOINTM,
+                MULTIPOINTZ,
+                MULTIPATCH,
+            ]
+        )
         # Preserve previous behaviour for anyone who set self.shapeType = None
         if not isinstance(shapeType, _NoShapeTypeSentinel):
             self.shapeType = shapeType
@@ -964,29 +973,31 @@ class NullShape(Shape):
     ) -> int:
         return 0
 
-
     def __repr__(self):
         return f"{self.__class__.__name__} #{self.oid}"
 
-_CanHaveBBox_shapeTypes = frozenset([
-    POLYLINE,
-    POLYLINEM,
-    POLYLINEZ,
-    MULTIPOINT,
-    MULTIPOINTM,
-    MULTIPOINTZ,
-    POLYGON,
-    POLYGONM,
-    POLYGONZ,
-    MULTIPATCH,
-])
+
+_CanHaveBBox_shapeTypes = frozenset(
+    [
+        POLYLINE,
+        POLYLINEM,
+        POLYLINEZ,
+        MULTIPOINT,
+        MULTIPOINTM,
+        MULTIPOINTZ,
+        POLYGON,
+        POLYGONM,
+        POLYGONZ,
+        MULTIPATCH,
+    ]
+)
+
 
 class _CanHaveBBox(Shape):
     """As well as setting bounding boxes, we also utilize the
     fact that this mixin applies to all the shapes that are
     not a single point.
     """
-    
 
     def __init__(
         self,
@@ -997,7 +1008,7 @@ class _CanHaveBBox(Shape):
         self.bbox: Optional[BBox] = None
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
-        self.bbox: BBox = unpack("<4d", b_io.read(32))
+        self.bbox = unpack("<4d", b_io.read(32))
         return self.bbox
 
     @staticmethod
@@ -1113,19 +1124,25 @@ class _CanHaveBBox(Shape):
             n += _CanHaveBBox._write_bbox_to_byte_stream(b_io, i, shape_bbox)
 
         if s.shapeType in _CanHaveParts_shapeTypes:
-            n += _CanHaveParts._write_nparts_to_byte_stream(b_io, cast(_CanHaveParts, s))
+            n += _CanHaveParts._write_nparts_to_byte_stream(
+                b_io, cast(_CanHaveParts, s)
+            )
         # Shape types with multiple points per record
         if s.shapeType in _CanHaveBBox_shapeTypes:
             n += _CanHaveBBox._write_npoints_to_byte_stream(b_io, cast(_CanHaveBBox, s))
         # Write part indexes.  Includes MultiPatch
         if s.shapeType in _CanHaveParts_shapeTypes:
-            n += _CanHaveParts._write_part_indices_to_byte_stream(b_io, cast(_CanHaveParts, s))
+            n += _CanHaveParts._write_part_indices_to_byte_stream(
+                b_io, cast(_CanHaveParts, s)
+            )
 
         if s.shapeType in MultiPatch_shapeTypes:
             n += MultiPatch._write_part_types_to_byte_stream(b_io, cast(MultiPatch, s))
         # Write points for multiple-point records
         if s.shapeType in _CanHaveBBox_shapeTypes:
-            n += _CanHaveBBox._write_points_to_byte_stream(b_io, cast(_CanHaveBBox, s), i)
+            n += _CanHaveBBox._write_points_to_byte_stream(
+                b_io, cast(_CanHaveBBox, s), i
+            )
         if s.shapeType in _HasZ_shapeTypes:
             n += _HasZ._write_zs_to_byte_stream(b_io, cast(_HasZ, s), i, shape_zbox)
 
@@ -1137,15 +1154,19 @@ class _CanHaveBBox(Shape):
     def __repr__(self):
         return f"{self.__class__.__name__} #{self.oid}"
 
-_CanHaveParts_shapeTypes = frozenset([
-    POLYLINE,
-    POLYLINEM,
-    POLYLINEZ,
-    POLYGON,
-    POLYGONM,
-    POLYGONZ,
-    MULTIPATCH,
-])
+
+_CanHaveParts_shapeTypes = frozenset(
+    [
+        POLYLINE,
+        POLYLINEM,
+        POLYLINEZ,
+        POLYGON,
+        POLYGONM,
+        POLYGONZ,
+        MULTIPATCH,
+    ]
+)
+
 
 class _CanHaveParts(_CanHaveBBox):
     # The parts attribute is initialised by
@@ -1178,6 +1199,7 @@ class _CanHaveParts(_CanHaveBBox):
 
 
 Point_shapeTypes = frozenset([POINT, POINTM, POINTZ])
+
 
 class Point(Shape):
     # We also use the fact that the single Point types are the only
@@ -1272,8 +1294,8 @@ class Point(Shape):
 
 Polyline_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
 
+
 class Polyline(_CanHaveParts):
-    
     def __init__(
         self,
         *args,
@@ -1282,10 +1304,11 @@ class Polyline(_CanHaveParts):
         super().__init__(*args, **kwargs)
         self._shapeTypes = Polyline_shapeTypes
 
+
 Polygon_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
 
-class Polygon(_CanHaveParts):
 
+class Polygon(_CanHaveParts):
     def __init__(
         self,
         *args,
@@ -1294,7 +1317,9 @@ class Polygon(_CanHaveParts):
         super().__init__(*args, **kwargs)
         self._shapeTypes = Polygon_shapeTypes
 
+
 MultiPoint_shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
+
 
 class MultiPoint(_CanHaveBBox):
     def __init__(
@@ -1304,6 +1329,7 @@ class MultiPoint(_CanHaveBBox):
     ):
         super().__init__(*args, **kwargs)
         self._shapeTypes = MultiPoint_shapeTypes
+
 
 # Not a PointM or a PointZ
 _HasM_shapeTypes = frozenset(
@@ -1318,8 +1344,8 @@ _HasM_shapeTypes = frozenset(
     ]
 )
 
-class _HasM(_CanHaveBBox):
 
+class _HasM(_CanHaveBBox):
     m: Sequence[Optional[float]]
 
     def __init__(self, *args, **kwargs):
@@ -1366,7 +1392,7 @@ class _HasM(_CanHaveBBox):
             else:
                 # if m values are stored as 3rd/4th dimension
                 # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-                mpos = 3 if s.shapeType in _HasZ__shapeTypes else 2
+                mpos = 3 if s.shapeType in _HasZ_shapeTypes else 2
                 ms = [
                     cast(float, p[mpos])
                     if len(p) > mpos and p[mpos] is not None
@@ -1394,8 +1420,8 @@ _HasZ_shapeTypes = frozenset(
     ]
 )
 
-class _HasZ(_CanHaveBBox):
 
+class _HasZ(_CanHaveBBox):
     z: Sequence[float]
 
     def __init__(self, *args, **kwargs):
@@ -1438,7 +1464,9 @@ class _HasZ(_CanHaveBBox):
 
         return num_bytes_written
 
+
 MultiPatch_shapeTypes = frozenset([MULTIPATCH])
+
 
 class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     def __init__(
@@ -1456,7 +1484,9 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     def _write_part_types_to_byte_stream(b_io: WriteableBinStream, s: Shape) -> int:
         return b_io.write(pack(f"<{len(s.partTypes)}i", *s.partTypes))
 
+
 PointM_shapeTypes = frozenset([POINTM, POINTZ])
+
 
 class PointM(Point):
     def __init__(
@@ -1527,6 +1557,7 @@ class PointM(Point):
 
 PolylineM_shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
 
+
 class PolylineM(Polyline, _HasM):
     def __init__(
         self,
@@ -1536,7 +1567,9 @@ class PolylineM(Polyline, _HasM):
         super().__init__(*args, **kwargs)
         self._shapeTypes = PolylineM_shapeTypes
 
+
 PolygonM_shapeTypes = frozenset([POLYGONM, POLYGONZ])
+
 
 class PolygonM(Polygon, _HasM):
     def __init__(
@@ -1550,6 +1583,7 @@ class PolygonM(Polygon, _HasM):
 
 MultiPointM_shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
 
+
 class MultiPointM(MultiPoint, _HasM):
     def __init__(
         self,
@@ -1561,6 +1595,7 @@ class MultiPointM(MultiPoint, _HasM):
 
 
 PointZ_shapeTypes = frozenset([POINTZ])
+
 
 class PointZ(PointM):
     def __init__(
@@ -1608,6 +1643,7 @@ class PointZ(PointM):
 
 PolylineZ_shapeTypes = frozenset([POLYLINEZ])
 
+
 class PolylineZ(PolylineM, _HasZ):
     def __init__(
         self,
@@ -1620,6 +1656,7 @@ class PolylineZ(PolylineM, _HasZ):
 
 PolygonZ_shapeTypes = frozenset([POLYGONZ])
 
+
 class PolygonZ(PolygonM, _HasZ):
     def __init__(
         self,
@@ -1631,6 +1668,7 @@ class PolygonZ(PolygonM, _HasZ):
 
 
 MultiPointZ_shapeTypes = frozenset([MULTIPOINTZ])
+
 
 class MultiPointZ(MultiPointM, _HasZ):
     def __init__(
