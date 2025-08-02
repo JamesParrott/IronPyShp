@@ -657,9 +657,6 @@ class _NoShapeTypeSentinel:
     """
 
 
-SHAPE_SLOTS = not bool(os.getenv("PYSHP_NO_SHAPE_SLOTS"))
-
-
 def _m_from_point(point: Union[PointMT, PointZT], mpos: int) -> Optional[float]:
     if len(point) > mpos and point[mpos] is not None:
         return cast(float, point[mpos])
@@ -683,21 +680,6 @@ def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
 
 
 class Shape:
-    if SHAPE_SLOTS:
-        __slots__ = [
-            "_shapeTypes",
-            "__oid",
-            "shapeType",
-            "points",
-            "parts",
-            "partTypes",
-            "_errors",
-            "m",
-            "z",
-            "bbox",
-            "mbox",
-            "zbox",
-        ]
 
     def __init__(
         self,
