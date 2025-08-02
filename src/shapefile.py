@@ -127,22 +127,6 @@ BBox = tuple[float, float, float, float]
 MBox = tuple[float, float]
 ZBox = tuple[float, float]
 
-# class BBox(NamedTuple):
-#     xmin: float
-#     ymin: float
-#     xmax: float
-#     ymax: float
-
-
-# class MBox(NamedTuple):
-#     mmin: Optional[float]
-#     mmax: Optional[float]
-
-
-# class ZBox(NamedTuple):
-#     zmin: float
-#     zmax: float
-
 
 class WriteableBinStream(Protocol):
     def write(self, b: bytes): ...
@@ -182,8 +166,6 @@ FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 class FieldType:
     """A bare bones 'enum', as the enum library noticeably slows performance."""
 
-    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
-
     C: Final = "C"  # "Character"  # (str)
     D: Final = "D"  # "Date"
     F: Final = "F"  # "Floating point"
@@ -197,13 +179,9 @@ class FieldType:
         "L",
         "M",
         "N",
-    }  # set(__slots__) - {"__members__"}
+    }  
 
-    # def raise_if_invalid(field_type: Hashable):
-    #     if field_type not in FieldType.__members__:
-    #         raise ShapefileException(
-    #             f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
-    #         )
+
 
 
 FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
@@ -725,8 +703,7 @@ class Shape:
         the patch type of each of the parts.
         """
         # Preserve previous behaviour for anyone who set self.shapeType = None
-        if not isinstance(shapeType, _NoShapeTypeSentinel):
-            self.shapeType = shapeType
+        self.shapeType = NULL if isinstance(shapeType, _NoShapeTypeSentinel) else shapeType
         self.points: PointsT = points or []
         self.parts: Sequence[int] = parts or []
         if partTypes:
