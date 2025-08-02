@@ -678,16 +678,36 @@ class Shape:
             "m",
             "z",
             "bbox",
+            "mbox",
+            "zbox",
         ]
 
-    def __initialise_attributes__(
+    def __init__(
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
         points: Optional[PointsT] = None,
         parts: Optional[Sequence[int]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
-    ) -> None:
+        *,
+        m: Optional[Sequence[Optional[float]]] = None,
+        z: Optional[Sequence[float]] = None,
+        bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
+        zbox: Optional[ZBox] = None,
+    ):
+        """Stores the geometry of the different shape types
+        specified in the Shapefile spec. Shape types are
+        usually point, polyline, or polygons. Every shape type
+        except the "Null" type contains points at some level for
+        example vertices in a polygon. If a shape type has
+        multiple shapes containing points within a single
+        geometry record then those shapes are called parts. Parts
+        are designated by their starting index in geometry record's
+        list of shapes. For MultiPatch geometry, partTypes designates
+        the patch type of each of the parts.
+        """
+
         # Preserve previous behaviour for anyone who set self.shapeType = None
         if not isinstance(shapeType, _NoShapeTypeSentinel):
             self.shapeType = shapeType
@@ -706,54 +726,20 @@ class Shape:
         # add oid
         self.__oid: int = -1 if oid is None else oid
 
-        # self.z: Optional[Union[list[Optional[float]], _Array[float]]] = None
-        # self.m: Optional[list[Optional[float]]] = None
-        # self.bbox: Optional[_Array[float]] = None
+        if m is not None:
+            self.m: Sequence[Optional[float]] = m
 
-    def __init__(
-        self,
-        shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
-        points: Optional[PointsT] = None,
-        parts: Optional[Sequence[int]] = None,
-        partTypes: Optional[Sequence[int]] = None,
-        oid: Optional[int] = None,
-    ):
-        """Stores the geometry of the different shape types
-        specified in the Shapefile spec. Shape types are
-        usually point, polyline, or polygons. Every shape type
-        except the "Null" type contains points at some level for
-        example vertices in a polygon. If a shape type has
-        multiple shapes containing points within a single
-        geometry record then those shapes are called parts. Parts
-        are designated by their starting index in geometry record's
-        list of shapes. For MultiPatch geometry, partTypes designates
-        the patch type of each of the parts.
-        """
-        self._shapeTypes = frozenset(
-            [
-                NULL,
-                POINT,
-                POINTM,
-                POINTZ,
-                POLYLINE,
-                POLYLINEM,
-                POLYLINEZ,
-                POLYGON,
-                POLYGONM,
-                POLYGONZ,
-                MULTIPOINT,
-                MULTIPOINTM,
-                MULTIPOINTZ,
-                MULTIPATCH,
-            ]
-        )
-        self.__initialise_attributes__(
-            shapeType=shapeType,
-            points=points,
-            parts=parts,
-            partTypes=partTypes,
-            oid=oid,
-        )
+        if z is not None:
+            self.z: Sequence[float] = z
+
+        if bbox is not None:
+            self.bbox: BBox = bbox
+
+        if mbox is not None:
+            self.mbox: MBox = mbox
+
+        if zbox is not None:
+            self.zbox: ZBox = zbox
 
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
@@ -961,8 +947,7 @@ class NullShape(Shape):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = frozenset([NULL])
+        Shape.__init__(self, *args, **kwargs)
 
     @classmethod
     def from_byte_stream(
@@ -1017,8 +1002,7 @@ class _CanHaveBBox(Shape):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self.bbox: Optional[BBox] = None
+        Shape.__init__(self, *args, **kwargs)
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
         self.bbox = unpack("<4d", b_io.read(32))
@@ -1190,8 +1174,7 @@ class _CanHaveParts(_CanHaveBBox):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = _CanHaveBBox_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
     @staticmethod
     def _get_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
@@ -1223,8 +1206,7 @@ class Point(Shape):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = Point_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
     def _set_single_point_z_from_byte_stream(self, b_io: ReadableBinStream):
         pass
@@ -1314,8 +1296,7 @@ class Polyline(_CanHaveParts):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = Polyline_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 Polygon_shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
@@ -1327,8 +1308,7 @@ class Polygon(_CanHaveParts):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = Polygon_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 MultiPoint_shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
@@ -1340,8 +1320,7 @@ class MultiPoint(_CanHaveBBox):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = MultiPoint_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 # Not a PointM or a PointZ
@@ -1362,9 +1341,8 @@ class _HasM(_CanHaveBBox):
     m: Sequence[Optional[float]]
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        Shape.__init__(self, *args, **kwargs)
         self.m = []
-        self._shapeTypes = _HasM_shapeTypes
 
     def _set_ms_from_byte_stream(
         self, b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
@@ -1438,9 +1416,8 @@ class _HasZ(_CanHaveBBox):
     z: Sequence[float]
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        Shape.__init__(self, *args, **kwargs)
         self.z = []
-        self._shapeTypes = _HasZ_shapeTypes
 
     def _set_zs_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
         __zmin, __zmax = unpack("<2d", b_io.read(16))
@@ -1487,8 +1464,7 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = MultiPatch_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
     def _set_part_types_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
         self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
@@ -1507,8 +1483,7 @@ class PointM(Point):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = PointM_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
     # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
     # PyShp encodes None m values as NODATA
@@ -1577,8 +1552,7 @@ class PolylineM(Polyline, _HasM):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = PolylineM_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 PolygonM_shapeTypes = frozenset([POLYGONM, POLYGONZ])
@@ -1590,8 +1564,7 @@ class PolygonM(Polygon, _HasM):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = PolygonM_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 MultiPointM_shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
@@ -1603,8 +1576,7 @@ class MultiPointM(MultiPoint, _HasM):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = MultiPointM_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 PointZ_shapeTypes = frozenset([POINTZ])
@@ -1616,8 +1588,7 @@ class PointZ(PointM):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = PointZ_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
@@ -1663,8 +1634,7 @@ class PolylineZ(PolylineM, _HasZ):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = PolylineZ_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 PolygonZ_shapeTypes = frozenset([POLYGONZ])
@@ -1676,8 +1646,7 @@ class PolygonZ(PolygonM, _HasZ):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = PolygonZ_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 MultiPointZ_shapeTypes = frozenset([MULTIPOINTZ])
@@ -1689,8 +1658,7 @@ class MultiPointZ(MultiPointM, _HasZ):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._shapeTypes = MultiPointZ_shapeTypes
+        Shape.__init__(self, *args, **kwargs)
 
 
 SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]]] = {
