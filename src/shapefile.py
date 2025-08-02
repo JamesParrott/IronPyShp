@@ -31,6 +31,7 @@ from typing import (
     Iterator,
     Literal,
     NamedTuple,
+    NoReturn,
     Optional,
     Protocol,
     Reversible,
@@ -45,7 +46,6 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from typing_extensions import Never, NotRequired, Self
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ class Field(NamedTuple):
         field_type: Union[str, bytes, FieldTypeT] = "C",
         size: int = 50,
         decimal: int = 0,
-    ) -> Self:
+    ) -> Field:
         try:
             type_ = FIELD_TYPE_ALIASES[field_type]
         except KeyError:
@@ -324,12 +324,8 @@ class GeoJSONFeatureCollection(TypedDict):
 
 
 class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
-    # bbox is optional
-    # typing.NotRequired requires Python 3.11
-    # and we must support 3.9 (at least until October)
-    # https://docs.python.org/3/library/typing.html#typing.Required
-    # Is there a backport?
-    bbox: NotRequired[list[float]]
+    # bbox is technically optional under the spec
+    bbox: list[float]
 
 
 # Helpers
@@ -1015,16 +1011,15 @@ class NullShape(Shape):
     ):
         Shape.__init__(self, shapeType = NULL, oid = oid)
 
-    @classmethod
+    @staticmethod
     def from_byte_stream(
-        cls,
         b_io: ReadSeekableBinStream,
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> Self:
+    ) -> NullShape:
         # Shape.__init__ sets self.points = points or []
-        return cls(oid=oid)
+        return NullShape(oid=oid)
 
     @staticmethod
     def write_to_byte_stream(
@@ -1131,7 +1126,7 @@ class _CanHaveBBox(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> Optional[Self]:
+    ) -> Optional[_CanHaveBBox]:
         shape = cls(oid=oid)
 
         shape_bbox = shape._get_set_bbox_from_byte_stream(b_io)
@@ -1295,7 +1290,7 @@ class Point(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> Optional[Self]:
+    ) -> Optional[Point]:
         shape = cls(oid=oid)
 
         x, y = cls._x_y_from_byte_stream(b_io)
@@ -3193,7 +3188,7 @@ class Writer:
     @overload
     def __getFileObj(self, f: str) -> WriteSeekableBinStream: ...
     @overload
-    def __getFileObj(self, f: None) -> Never: ...
+    def __getFileObj(self, f: None) -> NoReturn: ...
     @overload
     def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
     def __getFileObj(self, f):
