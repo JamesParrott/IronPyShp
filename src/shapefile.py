@@ -660,6 +660,28 @@ class _NoShapeTypeSentinel:
 SHAPE_SLOTS = not bool(os.getenv("PYSHP_NO_SHAPE_SLOTS"))
 
 
+def _m_from_point(point: Union[PointMT, PointZT], mpos: int) -> Optional[float]:
+    if len(point) > mpos and point[mpos] is not None:
+        return cast(float, point[mpos])
+    return None
+
+
+def _ms_from_points(
+    points: Union[list[PointMT], list[PointZT]], mpos: int
+) -> Iterator[Optional[float]]:
+    return (_m_from_point(p, mpos) for p in points)
+
+
+def _z_from_point(point: PointZT) -> float:
+    if len(point) >= 3 and point[2] is not None:
+        return point[2]
+    return 0.0
+
+
+def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
+    return (_z_from_point(p) for p in points)
+
+
 class Shape:
     if SHAPE_SLOTS:
         __slots__ = [
@@ -681,7 +703,7 @@ class Shape:
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
         points: Optional[PointsT] = None,
-        parts: Optional[list[int]] = None,
+        parts: Optional[list[int]] = None,  # index of start point of each part
         lines: Optional[list[PointsT]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
@@ -752,9 +774,23 @@ class Shape:
 
         if m is not None:
             self.m: Sequence[Optional[float]] = m
+        elif self.shapeType in _HasM_shapeTypes:
+            mpos = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
+            points_m_z = cast(Union[list[PointMT], list[PointZT]], self.points)
+            self.m = list(_ms_from_points(points_m_z, mpos))
+        elif self.shapeType in PointM_shapeTypes:
+            mpos = 3 if self.shapeType == POINTZ else 2
+            point_m_z = cast(Union[PointMT, PointZT], self.points[0])
+            self.m = (_m_from_point(point_m_z, mpos),)
 
         if z is not None:
             self.z: Sequence[float] = z
+        elif self.shapeType in _HasZ_shapeTypes:
+            points_z = cast(list[PointZT], self.points)
+            self.z = list(_zs_from_points(points_z))
+        elif self.shapeType == POINTZ:
+            point_z = cast(PointZT, self.points[0])
+            self.m = (_z_from_point(point_z),)
 
         if bbox is not None:
             self.bbox: BBox = bbox
@@ -1339,9 +1375,15 @@ class Polyline(_CanHaveParts):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        if args:
+            if lines:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg lines. "
+                    f"Not both.  Got both: {args} and {lines=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to lines can be unpacked (arg1, arg2, *more_args, *lines, oid=oid,...)"
+                )
+            lines = list(args)
         Shape.__init__(
             self,
             lines=lines,
@@ -1365,9 +1407,7 @@ class Polygon(_CanHaveParts):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        lines = list(args) if args else lines
         Shape.__init__(
             self,
             lines=lines,
@@ -1389,9 +1429,16 @@ class MultiPoint(_CanHaveBBox):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        points = points or []
-        for arg in reversed(args):
-            points.insert(0, arg)
+        if args:
+            if points:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg points. "
+                    f"Not both.  Got both: {args} and {points=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to points can be unpacked, e.g. "
+                    " (arg1, arg2, *more_args, *points, oid=oid,...)"
+                )
+            points = list(args)
         Shape.__init__(
             self,
             points=points,
@@ -1451,20 +1498,18 @@ class _HasM(_CanHaveBBox):
         try:
             if getattr(s, "m", False):
                 # if m values are stored in attribute
-                ms = [m if m is not None else NODATA for m in cast(_HasM, s).m]
+                ms = cast(_HasM, s).m
 
             else:
                 # if m values are stored as 3rd/4th dimension
                 # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                 mpos = 3 if s.shapeType in _HasZ_shapeTypes else 2
-                ms = [
-                    cast(float, p[mpos])
-                    if len(p) > mpos and p[mpos] is not None
-                    else NODATA
-                    for p in s.points
-                ]
+                points = cast(Union[list[PointMT], list[PointZT]], s.points)
+                ms = list(_ms_from_points(points, mpos))
 
-            num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms))
+            ms_to_encode = [m if m is not None else NODATA for m in ms]
+
+            num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
 
         except error:
             raise ShapefileException(
@@ -1513,7 +1558,10 @@ class _HasZ(_CanHaveBBox):
                 zs = cast(_HasZ, s).z
             else:
                 # if z values are stored as 3rd dimension
-                zs = [cast(float, p[2]) if len(p) > 2 else 0 for p in s.points]
+                # zs = [cast(float, p[2]) if len(p) > 2 else 0 for p in s.points]
+                points = cast(list[PointZT], s.points)
+
+                zs = list(_zs_from_points(points))
 
             num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
         except error:
@@ -1540,9 +1588,15 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        if args:
+            if lines:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg lines. "
+                    f"Not both.  Got both: {args} and {lines=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to lines can be unpacked (arg1, arg2, *more_args, *lines, oid=oid,...)"
+                )
+            lines = list(args)
         Shape.__init__(
             self,
             lines=lines,
@@ -1571,14 +1625,12 @@ class PointM(Point):
         self,
         x: float,
         y: float,
-        m: Optional[float],
+        # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
+        # PyShp encodes None m values as NODATA
+        m: Optional[float] = None,
         oid: Optional[int] = None,
     ):
         Shape.__init__(self, points=[(x, y)], m=(m,), oid=oid)
-
-    # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
-    # PyShp encodes None m values as NODATA
-    m = (None,)
 
     def _set_single_point_m_from_byte_stream(
         self, b_io: ReadSeekableBinStream, next_shape: int
@@ -1607,7 +1659,7 @@ class PointM(Point):
                 #     s.m = (NODATA,)
                 # m = s.m[0]
                 s = cast(_HasM, s)
-                m = s.m[0] if s.m and s.m[0] is not None else NODATA
+                m = s.m[0] if s.m else None
             except error:
                 raise ShapefileException(
                     f"Failed to write measure value for record {i}. Expected floats."
@@ -1617,21 +1669,26 @@ class PointM(Point):
             # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
             try:
                 mpos = 3 if s.shapeType == POINTZ else 2
-                if len(s.points[0]) < mpos + 1:
-                    # s.points[0].append(NODATA)
-                    m = NODATA
-                elif s.points[0][mpos] is None:
-                    # s.points[0][mpos] = NODATA
-                    m = NODATA
-                else:
-                    m = cast(float, s.points[0][mpos])
+                point = cast(Union[PointMT, PointZT], s.points[0])
+                m_pt = _m_from_point(point, mpos)
+                m = m_pt if m_pt is not None else None
+                # if len(s.points[0]) < mpos + 1:
+                #     # s.points[0].append(NODATA)
+                #     m = NODATA
+                # elif s.points[0][mpos] is None:
+                #     # s.points[0][mpos] = NODATA
+                #     m = NODATA
+                # else:
+                #     m = cast(float, s.points[0][mpos])
 
             except error:
                 raise ShapefileException(
                     f"Failed to write measure value for record {i}. Expected floats."
                 )
 
-        return b_io.write(pack("<1d", m))
+        m_to_encode = m if m is not None else NODATA
+
+        return b_io.write(pack("<1d", m_to_encode))
 
 
 PolylineM_shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
@@ -1648,9 +1705,15 @@ class PolylineM(Polyline, _HasM):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        if args:
+            if lines:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg lines. "
+                    f"Not both.  Got both: {args} and {lines=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to lines can be unpacked (arg1, arg2, *more_args, *lines, oid=oid,...)"
+                )
+            lines = list(args)
         Shape.__init__(
             self,
             lines=lines,
@@ -1676,9 +1739,15 @@ class PolygonM(Polygon, _HasM):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        if args:
+            if lines:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg lines. "
+                    f"Not both.  Got both: {args} and {lines=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to lines can be unpacked (arg1, arg2, *more_args, *lines, oid=oid,...)"
+                )
+            lines = list(args)
         Shape.__init__(
             self,
             lines=lines,
@@ -1702,9 +1771,16 @@ class MultiPointM(MultiPoint, _HasM):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        points = points or []
-        for arg in reversed(args):
-            points.insert(0, arg)
+        if args:
+            if points:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg points. "
+                    f"Not both.  Got both: {args} and {points=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to points can be unpacked, e.g. "
+                    " (arg1, arg2, *more_args, *points, oid=oid,...)"
+                )
+            points = list(args)
         Shape.__init__(
             self,
             points=points,
@@ -1753,8 +1829,10 @@ class PointZ(PointM):
         else:
             # if z values are stored as 3rd dimension
             try:
-                if len(s.points[0]) >= 3 and s.points[0][2] is not None:
-                    z = s.points[0][2]
+                point = cast(PointZT, s.points[0])
+                z = _z_from_point(point)
+                # if len(s.points[0]) >= 3 and s.points[0][2] is not None:
+                #     z = s.points[0][2]
             except error:
                 raise ShapefileException(
                     f"Failed to write elevation value for record {i}. Expected floats."
@@ -1778,9 +1856,15 @@ class PolylineZ(PolylineM, _HasZ):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        if args:
+            if lines:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg lines. "
+                    f"Not both.  Got both: {args} and {lines=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to lines can be unpacked (arg1, arg2, *more_args, *lines, oid=oid,...)"
+                )
+            lines = list(args)
         Shape.__init__(
             self,
             lines=lines,
@@ -1808,9 +1892,15 @@ class PolygonZ(PolygonM, _HasZ):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        lines = lines or []
-        for arg in reversed(args):
-            lines.insert(0, arg)
+        if args:
+            if lines:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg lines. "
+                    f"Not both.  Got both: {args} and {lines=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to lines can be unpacked (arg1, arg2, *more_args, *lines, oid=oid,...)"
+                )
+            lines = list(args)
         Shape.__init__(
             self,
             lines=lines,
@@ -1836,9 +1926,16 @@ class MultiPointZ(MultiPointM, _HasZ):
         bbox: Optional[BBox] = None,
         oid: Optional[int] = None,
     ):
-        points = points or []
-        for arg in reversed(args):
-            points.insert(0, arg)
+        if args:
+            if points:
+                raise ShapefileException(
+                    "Specify Either: a) positional args, or: b) the keyword arg points. "
+                    f"Not both. Got both: {args} and {points=}. "
+                    "If this was intentional, after the other positional args, "
+                    "the arg passed to points can be unpacked, e.g. "
+                    " (arg1, arg2, , ..., *more_args, *points, oid=oid, ...)"
+                )
+            points = list(args)
         Shape.__init__(
             self,
             points=points,
