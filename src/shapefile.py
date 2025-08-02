@@ -3647,15 +3647,15 @@ class Writer:
                         # first try to force directly to int.
                         # forcing a large int to float and back to int
                         # will lose information and result in wrong nr.
-                        num_val = int(value)
+                        num_val = int(cast(int, value))
                     except ValueError:
                         # forcing directly to int failed, so was probably a float.
-                        num_val = int(float(value))
+                        num_val = int(float(cast(float, value)))
                     str_val = format(num_val, "d")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
                 else:
-                    f_val = float(value)
+                    f_val = float(cast(float, value))
                     str_val = format(f_val, f".{deci}f")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
