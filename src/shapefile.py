@@ -1587,6 +1587,8 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
         points: Optional[PointsT] = None,
         parts: Optional[list[int]] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
+        zbox: Optional[ZBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1607,6 +1609,8 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
             z=z,
             m=m,
             bbox=bbox,
+            zbox=zbox,
+            mbox=mbox,
             oid=oid,
         )
 
@@ -1680,6 +1684,7 @@ class PolylineM(Polyline, _HasM):
         m: Optional[Sequence[Optional[float]]] = None,
         points: Optional[PointsT] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1698,6 +1703,7 @@ class PolylineM(Polyline, _HasM):
             parts=parts,
             m=m,
             bbox=bbox,
+            mbox=mbox,
             oid=oid,
         )
 
@@ -1714,6 +1720,7 @@ class PolygonM(Polygon, _HasM):
         m: Optional[list[Optional[float]]] = None,
         points: Optional[PointsT] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1732,6 +1739,7 @@ class PolygonM(Polygon, _HasM):
             parts=parts,
             m=m,
             bbox=bbox,
+            mbox=mbox,
             oid=oid,
         )
 
@@ -1746,6 +1754,7 @@ class MultiPointM(MultiPoint, _HasM):
         points: Optional[PointsT] = None,
         m: Optional[Sequence[Optional[float]]] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1763,6 +1772,7 @@ class MultiPointM(MultiPoint, _HasM):
             points=points,
             m=m,
             bbox=bbox,
+            mbox=mbox,
             oid=oid,
         )
 
@@ -1820,6 +1830,8 @@ class PolylineZ(PolylineM, _HasZ):
         points: Optional[PointsT] = None,
         parts: Optional[list[int]] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
+        zbox: Optional[ZBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1839,6 +1851,8 @@ class PolylineZ(PolylineM, _HasZ):
             z=z,
             m=m,
             bbox=bbox,
+            zbox=zbox,
+            mbox=mbox,
             oid=oid,
         )
 
@@ -1856,6 +1870,8 @@ class PolygonZ(PolygonM, _HasZ):
         m: Optional[list[Optional[float]]] = None,
         points: Optional[PointsT] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
+        zbox: Optional[ZBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1875,6 +1891,8 @@ class PolygonZ(PolygonM, _HasZ):
             z=z,
             m=m,
             bbox=bbox,
+            mbox=mbox,
+            zbox=zbox,
             oid=oid,
         )
 
@@ -1890,6 +1908,8 @@ class MultiPointZ(MultiPointM, _HasZ):
         z: Optional[list[float]] = None,
         m: Optional[Sequence[Optional[float]]] = None,
         bbox: Optional[BBox] = None,
+        mbox: Optional[MBox] = None,
+        zbox: Optional[ZBox] = None,
         oid: Optional[int] = None,
     ):
         if args:
@@ -1908,6 +1928,8 @@ class MultiPointZ(MultiPointM, _HasZ):
             bbox=bbox,
             z=z,
             m=m,
+            zbox=zbox,
+            mbox=mbox,
             oid=oid,
         )
 
