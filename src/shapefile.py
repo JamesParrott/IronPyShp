@@ -1181,12 +1181,12 @@ class _CanHaveBBox(Shape):
             kwargs["points"] = cls._read_points_from_byte_stream(b_io, nPoints)
 
             if shapeType in _HasZ_shapeTypes:
-                kwargs["zbox"], kwargs["zs"] = _HasZ._read_zs_from_byte_stream(
+                kwargs["zbox"], kwargs["z"] = _HasZ._read_zs_from_byte_stream(
                     b_io, nPoints
                 )
 
             if shapeType in _HasM_shapeTypes:
-                kwargs["mbox"], kwargs["ms"] = _HasM._read_ms_from_byte_stream(
+                kwargs["mbox"], kwargs["m"] = _HasM._read_ms_from_byte_stream(
                     b_io, nPoints, next_shape
                 )
 
