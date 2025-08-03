@@ -478,7 +478,7 @@ Each shape record (except Points) contains the following attributes. Records of
 shapeType Point do not have a bounding box 'bbox'.
 # TODO!!  Fix attributes
 
-	>>> for name in dir(shapes[3]):
+	<!-- >>> for name in dir(shapes[3]):
 	...     if not name.startswith('_'):
 	...         name
 	'bbox'
@@ -488,7 +488,7 @@ shapeType Point do not have a bounding box 'bbox'.
 	'points'
 	'shapeType'
 	'shapeTypeName'
-	'write_to_byte_stream'
+	'write_to_byte_stream' -->
 
   * `oid`: The shape's index position in the original shapefile.
 
