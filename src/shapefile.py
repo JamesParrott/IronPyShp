@@ -1147,7 +1147,10 @@ class _CanHaveBBox(Shape):
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
     ) -> Optional[Shape]:
-        shape_bbox = cls._read_bbox_from_byte_stream(b_io)
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+
+        kwargs = {"oid": oid}  # "shapeType": shapeType}
+        kwargs["bbox"] = shape_bbox = cls._read_bbox_from_byte_stream(b_io)
 
         # if bbox specified and no overlap, skip this shape
         if bbox is not None and not bbox_overlap(bbox, shape_bbox):
@@ -1164,48 +1167,48 @@ class _CanHaveBBox(Shape):
         # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
 
         if nParts:
-            parts = _CanHaveParts._read_parts_from_byte_stream(b_io, nParts)
-            partTypes = (
-                MultiPatch._read_part_types_from_byte_stream(b_io, nParts)
-                if shapeType == MULTIPATCH
-                else None
-            )
-        else:
-            parts = None
-            partTypes = None
+            kwargs["parts"] = _CanHaveParts._read_parts_from_byte_stream(b_io, nParts)
+            if shapeType == MULTIPATCH:
+                kwargs["partTypes"] = MultiPatch._read_part_types_from_byte_stream(
+                    b_io, nParts
+                )
+
+        # else:
+        #     parts = None
+        #     partTypes = None
 
         if nPoints:
-            points = cls._read_points_from_byte_stream(b_io, nPoints)
+            kwargs["points"] = cls._read_points_from_byte_stream(b_io, nPoints)
 
-            zbox, zs = (
-                _HasZ._read_zs_from_byte_stream(b_io, nPoints)
-                if shapeType in _HasZ_shapeTypes
-                else (None, None)
-            )
+            if shapeType in _HasZ_shapeTypes:
+                kwargs["zbox"], kwargs["zs"] = _HasZ._read_zs_from_byte_stream(
+                    b_io, nPoints
+                )
 
-            mbox, ms = (
-                _HasM._read_ms_from_byte_stream(b_io, nPoints, next_shape)
-                if shapeType in _HasM_shapeTypes
-                else (None, None)
-            )
-        else:
-            points = None
-            zbox, zs = None, None
-            mbox, ms = None, None
+            if shapeType in _HasM_shapeTypes:
+                kwargs["mbox"], kwargs["ms"] = _HasM._read_ms_from_byte_stream(
+                    b_io, nPoints, next_shape
+                )
 
-        return Shape(
-            shapeType=shapeType,
-            # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
-            points=cast(Optional[PointsT], points),
-            parts=parts,
-            partTypes=partTypes,
-            oid=oid,
-            m=ms,
-            z=zs,
-            bbox=shape_bbox,
-            mbox=mbox,
-            zbox=zbox,
-        )
+        # else:
+        #     points = None
+        #     zbox, zs = None, None
+        #     mbox, ms = None, None
+
+        return ShapeClass(**kwargs)  # type: ignore [arg-type]
+        # return ShapeClass(
+        #     shapeType=shapeType,
+        #     # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
+        #     points=cast(Optional[PointsT], points),
+        #     parts=parts,
+        #     partTypes=partTypes,
+        #     oid=oid,
+        #     m=ms,
+        #     z=zs,
+        #     bbox=shape_bbox,
+        #     mbox=mbox,
+        #     zbox=zbox,
+        # )
 
     @staticmethod
     def write_to_byte_stream(
@@ -1334,7 +1337,11 @@ class Point(Shape):
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
     ) -> Optional[Shape]:
-        x, y = cls._x_y_from_byte_stream(b_io)
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+
+        kwargs = {"oid": oid}  # "shapeType": shapeType}
+
+        x, y = kwargs["x"], kwargs["y"] = cls._x_y_from_byte_stream(b_io)
 
         if bbox is not None:
             # create bounding box for Point by duplicating coordinates
@@ -1342,19 +1349,16 @@ class Point(Shape):
             if not bbox_overlap(bbox, (x, y, x, y)):
                 return None
 
-        zs = (
-            PointZ._read_single_point_zs_from_byte_stream(b_io)
-            if shapeType == POINTZ
-            else None
-        )
+        if shapeType == POINTZ:
+            kwargs["z"] = PointZ._read_single_point_zs_from_byte_stream(b_io)
 
-        ms = (
-            PointM._read_single_point_ms_from_byte_stream(b_io, next_shape)
-            if shapeType in PointM_shapeTypes
-            else None
-        )
+        if shapeType in PointM_shapeTypes:
+            kwargs["m"] = PointM._read_single_point_ms_from_byte_stream(
+                b_io, next_shape
+            )
 
-        return Shape(shapeType=shapeType, points=[(x, y)], z=zs, m=ms, oid=oid)
+        return ShapeClass(**kwargs)  # type: ignore[arg-type]
+        # return Shape(shapeType=shapeType, points=[(x, y)], z=zs, m=ms, oid=oid)
 
     @staticmethod
     def write_to_byte_stream(b_io: WriteableBinStream, s: Shape, i: int) -> int:
