@@ -679,16 +679,14 @@ def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
     return (_z_from_point(p) for p in points)
 
 
-class ShapeKWArgs(TypedDict, total=False):
-    shapeType: Union[int, _NoShapeTypeSentinel]
+class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
+    oid: Optional[int]
     points: Optional[PointsT]
     parts: Optional[Sequence[int]]  # index of start point of each part
-    lines: Optional[list[PointsT]]
     partTypes: Optional[Sequence[int]]
-    oid: Optional[int]
+    bbox: Optional[BBox]
     m: Optional[Sequence[Optional[float]]]
     z: Optional[Sequence[float]]
-    bbox: Optional[BBox]
     mbox: Optional[MBox]
     zbox: Optional[ZBox]
 
@@ -1161,9 +1159,9 @@ class _CanHaveBBox(Shape):
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
     ) -> Optional[Shape]:
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+        ShapeClass = cast(type[_CanHaveBBox], SHAPE_CLASS_FROM_SHAPETYPE[shapeType])
 
-        kwargs: ShapeKWArgs = {"oid": oid}  # "shapeType": shapeType}
+        kwargs: CanHaveBboxNoLinesKwargs = {"oid": oid}  # "shapeType": shapeType}
         kwargs["bbox"] = shape_bbox = cls._read_bbox_from_byte_stream(b_io)
 
         # if bbox specified and no overlap, skip this shape
@@ -1192,7 +1190,9 @@ class _CanHaveBBox(Shape):
         #     partTypes = None
 
         if nPoints:
-            kwargs["points"] = cls._read_points_from_byte_stream(b_io, nPoints)
+            kwargs["points"] = cast(
+                PointsT, cls._read_points_from_byte_stream(b_io, nPoints)
+            )
 
             if shapeType in _HasZ_shapeTypes:
                 kwargs["zbox"], kwargs["z"] = _HasZ._read_zs_from_byte_stream(
@@ -1209,7 +1209,7 @@ class _CanHaveBBox(Shape):
         #     zbox, zs = None, None
         #     mbox, ms = None, None
 
-        return ShapeClass(**kwargs)  # type: ignore [arg-type]
+        return ShapeClass(**kwargs)
         # return ShapeClass(
         #     shapeType=shapeType,
         #     # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
@@ -1351,27 +1351,25 @@ class Point(Shape):
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
     ) -> Optional[Shape]:
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-
-        kwargs: ShapeKWArgs = {"oid": oid}  # "shapeType": shapeType}
-
-        x, y = kwargs["x"], kwargs["y"] = cls._x_y_from_byte_stream(b_io)
+        x, y = cls._x_y_from_byte_stream(b_io)
 
         if bbox is not None:
             # create bounding box for Point by duplicating coordinates
             # skip shape if no overlap with bounding box
             if not bbox_overlap(bbox, (x, y, x, y)):
                 return None
+        elif shapeType == POINT:
+            return Point(x=x, y=y, oid=oid)
 
         if shapeType == POINTZ:
-            kwargs["z"] = PointZ._read_single_point_zs_from_byte_stream(b_io)
+            z = PointZ._read_single_point_zs_from_byte_stream(b_io)[0]
 
-        if shapeType in PointM_shapeTypes:
-            kwargs["m"] = PointM._read_single_point_ms_from_byte_stream(
-                b_io, next_shape
-            )
+        m = PointM._read_single_point_ms_from_byte_stream(b_io, next_shape)[0]
 
-        return ShapeClass(**kwargs)  # type: ignore[arg-type]
+        if shapeType == POINTZ:
+            return PointZ(x=x, y=y, z=z, m=m, oid=oid)
+
+        return PointM(x=x, y=y, m=m, oid=oid)
         # return Shape(shapeType=shapeType, points=[(x, y)], z=zs, m=ms, oid=oid)
 
     @staticmethod
