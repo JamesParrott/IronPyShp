@@ -3359,7 +3359,6 @@ class Writer:
         if shape_bbox is None:
             return
 
-        # update global
         if self._bbox:
             # compare with existing
             self._bbox = (
@@ -3373,9 +3372,8 @@ class Writer:
             self._bbox = shape_bbox
 
     def _update_file_zbox(self, s: Union[_HasZ, PointZ]):
-        # update global
         if self._zbox:
-            # update file's so fatexisting
+            # compare with existing
             self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
         else:
             # first time zbox is being set
@@ -3383,7 +3381,6 @@ class Writer:
 
     def _update_file_mbox(self, s: Union[_HasM, PointM]):
         mbox = s.mbox
-        # update global
         if self._mbox:
             # compare with existing
             self._mbox = (min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1]))
