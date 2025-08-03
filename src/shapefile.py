@@ -679,6 +679,20 @@ def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
     return (_z_from_point(p) for p in points)
 
 
+class ShapeKWArgs(TypedDict, total=False):
+    shapeType: Union[int, _NoShapeTypeSentinel]
+    points: Optional[PointsT]
+    parts: Optional[Sequence[int]]  # index of start point of each part
+    lines: Optional[list[PointsT]]
+    partTypes: Optional[Sequence[int]]
+    oid: Optional[int]
+    m: Optional[Sequence[Optional[float]]]
+    z: Optional[Sequence[float]]
+    bbox: Optional[BBox]
+    mbox: Optional[MBox]
+    zbox: Optional[ZBox]
+
+
 class Shape:
     def __init__(
         self,
@@ -1149,7 +1163,7 @@ class _CanHaveBBox(Shape):
     ) -> Optional[Shape]:
         ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
 
-        kwargs = {"oid": oid}  # "shapeType": shapeType}
+        kwargs: ShapeKWArgs = {"oid": oid}  # "shapeType": shapeType}
         kwargs["bbox"] = shape_bbox = cls._read_bbox_from_byte_stream(b_io)
 
         # if bbox specified and no overlap, skip this shape
@@ -1339,7 +1353,7 @@ class Point(Shape):
     ) -> Optional[Shape]:
         ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
 
-        kwargs = {"oid": oid}  # "shapeType": shapeType}
+        kwargs: ShapeKWArgs = {"oid": oid}  # "shapeType": shapeType}
 
         x, y = kwargs["x"], kwargs["y"] = cls._x_y_from_byte_stream(b_io)
 

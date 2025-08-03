@@ -465,11 +465,7 @@ is the shape's count from 0. So to read the 8th shape record you would use its
 index which is 7.
 
 
-	<!-- s = sf.shape(7)
-	>>> s
-	Polygon #7
-	>>> s
-	Shape #7: POLYGON -->
+	>>> s = sf.shape(7)
 
 
 	>>> # Read the bbox of the 8th shape to verify
