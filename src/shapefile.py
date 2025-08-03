@@ -684,7 +684,7 @@ class Shape:
         self,
         shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
         points: Optional[PointsT] = None,
-        parts: Optional[list[int]] = None,  # index of start point of each part
+        parts: Optional[Sequence[int]] = None,  # index of start point of each part
         lines: Optional[list[PointsT]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
@@ -755,7 +755,7 @@ class Shape:
 
         if bbox is not None:
             self.bbox: BBox = bbox
-        elif self.points:
+        elif len(self.points) >= 2:
             self.bbox = self._bbox_from_points()
 
         ms_found = True
@@ -849,7 +849,7 @@ class Shape:
 
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
-        if self.shapeType in [POINT, POINTM, POINTZ]:
+        if self.shapeType in {POINT, POINTM, POINTZ}:
             # point
             if len(self.points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
@@ -859,7 +859,7 @@ class Shape:
 
             return {"type": "Point", "coordinates": self.points[0]}
 
-        if self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
+        if self.shapeType in {MULTIPOINT, MULTIPOINTM, MULTIPOINTZ}:
             if len(self.points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
@@ -872,7 +872,7 @@ class Shape:
                 "coordinates": self.points,
             }
 
-        if self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
+        if self.shapeType in {POLYLINE, POLYLINEM, POLYLINEZ}:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
@@ -902,7 +902,7 @@ class Shape:
             coordinates.append(list(self.points[part:]))
             return {"type": "MultiLineString", "coordinates": coordinates}
 
-        if self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
+        if self.shapeType in {POLYGON, POLYGONM, POLYGONZ}:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
@@ -963,22 +963,21 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
     @staticmethod
     def _from_geojson(geoj) -> Shape:
         # create empty shape
-        shape = Shape()
         # set shapeType
         geojType = geoj["type"] if geoj else "Null"
         if geojType in GEOJSON_TO_SHAPETYPE:
-            shape.shapeType = GEOJSON_TO_SHAPETYPE[geojType]
+            shapeType = GEOJSON_TO_SHAPETYPE[geojType]
         else:
             raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
 
         # set points and parts
         if geojType == "Point":
-            shape.points = [geoj["coordinates"]]
-            shape.parts = [0]
+            points = [geoj["coordinates"]]
+            parts = [0]
         elif geojType in ("MultiPoint", "LineString"):
-            shape.points = geoj["coordinates"]
-            shape.parts = [0]
-        elif geojType in ("Polygon",):
+            points = geoj["coordinates"]
+            parts = [0]
+        elif geojType == "Polygon":
             points = []
             parts = []
             index = 0
@@ -995,9 +994,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 points.extend(ext_or_hole)
                 parts.append(index)
                 index += len(ext_or_hole)
-            shape.points = points
-            shape.parts = parts
-        elif geojType in ("MultiLineString",):
+        elif geojType == "MultiLineString":
             points = []
             parts = []
             index = 0
@@ -1005,9 +1002,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 points.extend(linestring)
                 parts.append(index)
                 index += len(linestring)
-            shape.points = points
-            shape.parts = parts
-        elif geojType in ("MultiPolygon",):
+        elif geojType == "MultiPolygon":
             points = []
             parts = []
             index = 0
@@ -1025,9 +1020,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                     points.extend(ext_or_hole)
                     parts.append(index)
                     index += len(ext_or_hole)
-            shape.points = points
-            shape.parts = parts
-        return shape
+        return Shape(shapeType=shapeType, points=points, parts=parts)
 
     @property
     def oid(self) -> int:
@@ -1039,7 +1032,10 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return SHAPETYPE_LOOKUP[self.shapeType]
 
     def __repr__(self):
-        return f"Shape #{self.__oid}: {self.shapeTypeName}"
+        class_name = self.__class__.__name__
+        if class_name == "Shape":
+            return f"Shape #{self.__oid}: {self.shapeTypeName}"
+        return f"{class_name} #{self.__oid}"
 
 
 # Need unused arguments to keep the same call signature for
@@ -1072,9 +1068,6 @@ class NullShape(Shape):
         i: int,
     ) -> int:
         return 0
-
-    def __repr__(self):
-        return f"{self.__class__.__name__} #{self.oid}"
 
 
 _CanHaveBBox_shapeTypes = frozenset(
@@ -1187,24 +1180,23 @@ class _CanHaveBBox(Shape):
             zbox, zs = (
                 _HasZ._read_zs_from_byte_stream(b_io, nPoints)
                 if shapeType in _HasZ_shapeTypes
-                else None,
-                None,
+                else (None, None)
             )
 
             mbox, ms = (
                 _HasM._read_ms_from_byte_stream(b_io, nPoints, next_shape)
                 if shapeType in _HasM_shapeTypes
-                else None,
-                None,
+                else (None, None)
             )
         else:
             points = None
             zbox, zs = None, None
-            ms = None, None
+            mbox, ms = None, None
 
         return Shape(
             shapeType=shapeType,
-            points=points,
+            # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
+            points=cast(Optional[PointsT], points),
             parts=parts,
             partTypes=partTypes,
             oid=oid,
@@ -1260,9 +1252,6 @@ class _CanHaveBBox(Shape):
 
         return n
 
-    def __repr__(self):
-        return f"{self.__class__.__name__} #{self.oid}"
-
 
 _CanHaveParts_shapeTypes = frozenset(
     [
@@ -1291,7 +1280,9 @@ class _CanHaveParts(_CanHaveBBox):
         return b_io.write(pack("<i", len(s.parts)))
 
     @staticmethod
-    def _read_parts_from_byte_stream(b_io: ReadableBinStream, nParts: int) -> list[int]:
+    def _read_parts_from_byte_stream(
+        b_io: ReadableBinStream, nParts: int
+    ) -> _Array[int]:
         return _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
@@ -1342,7 +1333,7 @@ class Point(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> Optional[Point]:
+    ) -> Optional[Shape]:
         x, y = cls._x_y_from_byte_stream(b_io)
 
         if bbox is not None:
@@ -1380,9 +1371,6 @@ class Point(Shape):
             n += PointM._write_single_point_m_to_byte_stream(b_io, s, i)
 
         return n
-
-    def __repr__(self):
-        return f"{self.__class__.__name__} #{self.oid}"
 
 
 Polyline_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
@@ -1551,7 +1539,7 @@ class _HasZ(_CanHaveBBox):
     @staticmethod
     def _read_zs_from_byte_stream(
         b_io: ReadableBinStream, nPoints: int
-    ) -> tuple[ZBox, list[float]]:
+    ) -> tuple[ZBox, Sequence[float]]:
         zbox = unpack("<2d", b_io.read(16))
         return zbox, _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
@@ -1618,9 +1606,10 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
             oid=oid,
         )
 
+    @staticmethod
     def _read_part_types_from_byte_stream(
-        self, b_io: ReadableBinStream, nParts: int
-    ) -> list[int]:
+        b_io: ReadableBinStream, nParts: int
+    ) -> Sequence[int]:
         return _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
@@ -1643,8 +1632,9 @@ class PointM(Point):
     ):
         Shape.__init__(self, points=[(x, y)], m=(m,), oid=oid)
 
+    @staticmethod
     def _read_single_point_ms_from_byte_stream(
-        self, b_io: ReadSeekableBinStream, next_shape: int
+        b_io: ReadSeekableBinStream, next_shape: int
     ) -> tuple[Optional[float]]:
         if next_shape - b_io.tell() >= 8:
             (m,) = unpack("<d", b_io.read(8))
@@ -1790,9 +1780,8 @@ class PointZ(PointM):
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
-    def _read_single_point_zs_from_byte_stream(
-        self, b_io: ReadableBinStream
-    ) -> tuple[float]:
+    @staticmethod
+    def _read_single_point_zs_from_byte_stream(b_io: ReadableBinStream) -> tuple[float]:
         return unpack("<d", b_io.read(8))
 
     @staticmethod
@@ -3338,7 +3327,7 @@ class Writer:
         elif s.shapeType in _CanHaveBBox_shapeTypes:
             shape_bbox = s.bbox
         else:
-            x, y = s.points[0]
+            x, y = s.points[0][:2]
             shape_bbox = (x, y, x, y)
 
         if shape_bbox is None:
