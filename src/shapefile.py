@@ -1050,224 +1050,184 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return f"{class_name} #{self.__oid}"
 
 
-# Need unused arguments to keep the same call signature for
-# different implementations of from_byte_stream and write_to_byte_stream
 class NullShape(Shape):
-    # Shape.shapeType = NULL already,
-    # to preserve handling of default args in Shape.__init__
-    # Repeated for clarity.
+    # shapeType = NULL repeated for clarity.
     def __init__(
         self,
         oid: Optional[int] = None,
     ):
         Shape.__init__(self, shapeType=NULL, oid=oid)
 
-    @staticmethod
-    def from_byte_stream(
-        shapeType: int,
-        b_io: ReadSeekableBinStream,
-        next_shape: int,
-        oid: Optional[int] = None,
-        bbox: Optional[BBox] = None,
-    ) -> NullShape:
-        # Shape.__init__ sets self.points = points or []
-        return NullShape(oid=oid)
 
-    @staticmethod
-    def write_to_byte_stream(
-        b_io: WriteableBinStream,
-        s: Shape,
-        i: int,
-    ) -> int:
-        return 0
+def _null_shape_from_byte_stream(
+    shapeType: int,
+    b_io: ReadSeekableBinStream,
+    next_shape: int,
+    oid: Optional[int] = None,
+    bbox: Optional[BBox] = None,
+) -> NullShape:
+    # Shape.__init__ sets self.points = points or []
+    return NullShape(oid=oid)
 
 
-_CanHaveBBox_shapeTypes = frozenset(
-    [
-        POLYLINE,
-        POLYLINEM,
-        POLYLINEZ,
-        MULTIPOINT,
-        MULTIPOINTM,
-        MULTIPOINTZ,
-        POLYGON,
-        POLYGONM,
-        POLYGONZ,
-        MULTIPATCH,
-    ]
-)
+def _write_null_shape_to_byte_stream(
+    b_io: WriteableBinStream,
+    s: Shape,
+    i: int,
+) -> int:
+    return 0
 
 
-class _CanHaveBBox(Shape):
-    """As well as setting bounding boxes, we also utilize the
-    fact that this mixin applies to all the shapes that are
-    not a single point.
-    """
+def _read_bbox_from_byte_stream(b_io: ReadableBinStream) -> BBox:
+    return unpack("<4d", b_io.read(32))
 
-    @staticmethod
-    def _read_bbox_from_byte_stream(b_io: ReadableBinStream) -> BBox:
-        return unpack("<4d", b_io.read(32))
 
-    @staticmethod
-    def _write_bbox_to_byte_stream(
-        b_io: WriteableBinStream, i: int, bbox: Optional[BBox]
-    ) -> int:
-        if not bbox or len(bbox) != 4:
-            raise ShapefileException(f"Four numbers required for bbox. Got: {bbox}")
-        try:
-            return b_io.write(pack("<4d", *bbox))
-        except error:
-            raise ShapefileException(
-                f"Failed to write bounding box for record {i}. Expected floats."
-            )
-
-    @staticmethod
-    def _read_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
-        return unpack("<i", b_io.read(4))[0]
-
-    @staticmethod
-    def _write_npoints_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveBBox) -> int:
-        return b_io.write(pack("<i", len(s.points)))
-
-    @staticmethod
-    def _read_points_from_byte_stream(
-        b_io: ReadableBinStream, nPoints: int
-    ) -> list[Point2D]:
-        flat = unpack(f"<{2 * nPoints}d", b_io.read(16 * nPoints))
-        return list(zip(*(iter(flat),) * 2))
-
-    @staticmethod
-    def _write_points_to_byte_stream(
-        b_io: WriteableBinStream, s: _CanHaveBBox, i: int
-    ) -> int:
-        x_ys: list[float] = []
-        for point in s.points:
-            x_ys.extend(point[:2])
-        try:
-            return b_io.write(pack(f"<{len(x_ys)}d", *x_ys))
-        except error:
-            raise ShapefileException(
-                f"Failed to write points for record {i}. Expected floats."
-            )
-
-    @classmethod
-    def from_byte_stream(
-        cls,
-        shapeType: int,
-        b_io: ReadSeekableBinStream,
-        next_shape: int,
-        oid: Optional[int] = None,
-        bbox: Optional[BBox] = None,
-    ) -> Optional[Shape]:
-        ShapeClass = cast(type[_CanHaveBBox], SHAPE_CLASS_FROM_SHAPETYPE[shapeType])
-
-        kwargs: CanHaveBboxNoLinesKwargs = {"oid": oid}  # "shapeType": shapeType}
-        kwargs["bbox"] = shape_bbox = cls._read_bbox_from_byte_stream(b_io)
-
-        # if bbox specified and no overlap, skip this shape
-        if bbox is not None and not bbox_overlap(bbox, shape_bbox):
-            # because we stop parsing this shape, caller must skip to beginning of
-            # next shape after we return (as done in f.seek(next_shape))
-            return None
-
-        nParts: Optional[int] = (
-            _CanHaveParts._read_nparts_from_byte_stream(b_io)
-            if shapeType in _CanHaveParts_shapeTypes
-            else None
+def _write_bbox_to_byte_stream(
+    b_io: WriteableBinStream, i: int, bbox: Optional[BBox]
+) -> int:
+    if not bbox or len(bbox) != 4:
+        raise ShapefileException(f"Four numbers required for bbox. Got: {bbox}")
+    try:
+        return b_io.write(pack("<4d", *bbox))
+    except error:
+        raise ShapefileException(
+            f"Failed to write bounding box for record {i}. Expected floats."
         )
-        nPoints: int = cls._read_npoints_from_byte_stream(b_io)
-        # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
 
-        if nParts:
-            kwargs["parts"] = _CanHaveParts._read_parts_from_byte_stream(b_io, nParts)
-            if shapeType == MULTIPATCH:
-                kwargs["partTypes"] = MultiPatch._read_part_types_from_byte_stream(
-                    b_io, nParts
-                )
 
-        # else:
-        #     parts = None
-        #     partTypes = None
+def _read_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
+    return unpack("<i", b_io.read(4))[0]
 
-        if nPoints:
-            kwargs["points"] = cast(
-                PointsT, cls._read_points_from_byte_stream(b_io, nPoints)
+
+def _write_npoints_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveBBoxT) -> int:
+    return b_io.write(pack("<i", len(s.points)))
+
+
+def _read_points_from_byte_stream(
+    b_io: ReadableBinStream, nPoints: int
+) -> list[Point2D]:
+    flat = unpack(f"<{2 * nPoints}d", b_io.read(16 * nPoints))
+    return list(zip(*(iter(flat),) * 2))
+
+
+def _write_points_to_byte_stream(
+    b_io: WriteableBinStream, s: _CanHaveBBoxT, i: int
+) -> int:
+    x_ys: list[float] = []
+    for point in s.points:
+        x_ys.extend(point[:2])
+    try:
+        return b_io.write(pack(f"<{len(x_ys)}d", *x_ys))
+    except error:
+        raise ShapefileException(
+            f"Failed to write points for record {i}. Expected floats."
+        )
+
+
+def _non_single_point_shape_from_byte_stream(
+    shapeType: int,
+    b_io: ReadSeekableBinStream,
+    next_shape: int,
+    oid: Optional[int] = None,
+    bbox: Optional[BBox] = None,
+) -> Optional[Shape]:
+    ShapeClass = cast(type[_CanHaveBBoxT], SHAPE_CLASS_FROM_SHAPETYPE[shapeType])
+
+    kwargs: CanHaveBboxNoLinesKwargs = {"oid": oid}  # "shapeType": shapeType}
+    kwargs["bbox"] = shape_bbox = _read_bbox_from_byte_stream(b_io)
+
+    # if bbox specified and no overlap, skip this shape
+    if bbox is not None and not bbox_overlap(bbox, shape_bbox):
+        # because we stop parsing this shape, caller must skip to beginning of
+        # next shape after we return (as done in f.seek(next_shape))
+        return None
+
+    nParts: Optional[int] = (
+        _read_nparts_from_byte_stream(b_io)
+        if shapeType in _CanHaveParts_shapeTypes
+        else None
+    )
+    nPoints: int = _read_npoints_from_byte_stream(b_io)
+    # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
+
+    if nParts:
+        kwargs["parts"] = _read_parts_from_byte_stream(b_io, nParts)
+        if shapeType == MULTIPATCH:
+            kwargs["partTypes"] = _read_part_types_from_byte_stream(b_io, nParts)
+
+    # else:
+    #     parts = None
+    #     partTypes = None
+
+    if nPoints:
+        kwargs["points"] = cast(PointsT, _read_points_from_byte_stream(b_io, nPoints))
+
+        if shapeType in _HasZ_shapeTypes:
+            kwargs["zbox"], kwargs["z"] = _read_zs_from_byte_stream(b_io, nPoints)
+
+        if shapeType in _HasM_shapeTypes:
+            kwargs["mbox"], kwargs["m"] = _read_ms_from_byte_stream(
+                b_io, nPoints, next_shape
             )
 
-            if shapeType in _HasZ_shapeTypes:
-                kwargs["zbox"], kwargs["z"] = _HasZ._read_zs_from_byte_stream(
-                    b_io, nPoints
-                )
+    # else:
+    #     points = None
+    #     zbox, zs = None, None
+    #     mbox, ms = None, None
 
-            if shapeType in _HasM_shapeTypes:
-                kwargs["mbox"], kwargs["m"] = _HasM._read_ms_from_byte_stream(
-                    b_io, nPoints, next_shape
-                )
+    return ShapeClass(**kwargs)
+    # return ShapeClass(
+    #     shapeType=shapeType,
+    #     # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
+    #     points=cast(Optional[PointsT], points),
+    #     parts=parts,
+    #     partTypes=partTypes,
+    #     oid=oid,
+    #     m=ms,
+    #     z=zs,
+    #     bbox=shape_bbox,
+    #     mbox=mbox,
+    #     zbox=zbox,
+    # )
 
-        # else:
-        #     points = None
-        #     zbox, zs = None, None
-        #     mbox, ms = None, None
 
-        return ShapeClass(**kwargs)
-        # return ShapeClass(
-        #     shapeType=shapeType,
-        #     # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
-        #     points=cast(Optional[PointsT], points),
-        #     parts=parts,
-        #     partTypes=partTypes,
-        #     oid=oid,
-        #     m=ms,
-        #     z=zs,
-        #     bbox=shape_bbox,
-        #     mbox=mbox,
-        #     zbox=zbox,
-        # )
+def _write_non_single_point_shape_to_byte_stream(
+    b_io: WriteableBinStream,
+    s: Shape,
+    i: int,
+) -> int:
+    # We use functions here and below,
+    # to support s only being an instance of a the
+    # Shape base class (with shapeType set)
+    # i.e. not necessarily one of our newer shape specific
+    # sub classes.
 
-    @staticmethod
-    def write_to_byte_stream(
-        b_io: WriteableBinStream,
-        s: Shape,
-        i: int,
-    ) -> int:
-        # We use static methods here and below,
-        # to support s only being an instance of a the
-        # Shape base class (with shapeType set)
-        # i.e. not necessarily one of our newer shape specific
-        # sub classes.
+    n = 0
 
-        n = 0
+    if s.shapeType in _CanHaveBBox_shapeTypes:
+        n += _write_bbox_to_byte_stream(b_io, i, s.bbox)
 
-        if s.shapeType in _CanHaveBBox_shapeTypes:
-            n += _CanHaveBBox._write_bbox_to_byte_stream(b_io, i, s.bbox)
+    if s.shapeType in _CanHaveParts_shapeTypes:
+        n += _write_nparts_to_byte_stream(b_io, s)
+    # Shape types with multiple points per record
+    if s.shapeType in _CanHaveBBox_shapeTypes:
+        n += _write_npoints_to_byte_stream(b_io, s)
+    # Write part indexes.  Includes MultiPatch
+    if s.shapeType in _CanHaveParts_shapeTypes:
+        n += _write_part_indices_to_byte_stream(b_io, s)
 
-        if s.shapeType in _CanHaveParts_shapeTypes:
-            n += _CanHaveParts._write_nparts_to_byte_stream(
-                b_io, cast(_CanHaveParts, s)
-            )
-        # Shape types with multiple points per record
-        if s.shapeType in _CanHaveBBox_shapeTypes:
-            n += _CanHaveBBox._write_npoints_to_byte_stream(b_io, cast(_CanHaveBBox, s))
-        # Write part indexes.  Includes MultiPatch
-        if s.shapeType in _CanHaveParts_shapeTypes:
-            n += _CanHaveParts._write_part_indices_to_byte_stream(
-                b_io, cast(_CanHaveParts, s)
-            )
+    if s.shapeType in MultiPatch_shapeTypes:
+        n += _write_part_types_to_byte_stream(b_io, cast(MultiPatch, s))
+    # Write points for multiple-point records
+    if s.shapeType in _CanHaveBBox_shapeTypes:
+        n += _write_points_to_byte_stream(b_io, s, i)
+    if s.shapeType in _HasZ_shapeTypes:
+        n += _write_zs_to_byte_stream(b_io, s, i, s.zbox)
 
-        if s.shapeType in MultiPatch_shapeTypes:
-            n += MultiPatch._write_part_types_to_byte_stream(b_io, cast(MultiPatch, s))
-        # Write points for multiple-point records
-        if s.shapeType in _CanHaveBBox_shapeTypes:
-            n += _CanHaveBBox._write_points_to_byte_stream(
-                b_io, cast(_CanHaveBBox, s), i
-            )
-        if s.shapeType in _HasZ_shapeTypes:
-            n += _HasZ._write_zs_to_byte_stream(b_io, cast(_HasZ, s), i, s.zbox)
+    if s.shapeType in _HasM_shapeTypes:
+        n += _write_ms_to_byte_stream(b_io, s, i, s.mbox)
 
-        if s.shapeType in _HasM_shapeTypes:
-            n += _HasM._write_ms_to_byte_stream(b_io, cast(_HasM, s), i, s.mbox)
-
-        return n
+    return n
 
 
 _CanHaveParts_shapeTypes = frozenset(
@@ -1283,30 +1243,20 @@ _CanHaveParts_shapeTypes = frozenset(
 )
 
 
-class _CanHaveParts(_CanHaveBBox):
-    # The parts attribute is initialised by
-    # the base class Shape's __init__, to parts or [].
-    # "Can Have Parts" should be read as "Can Have non-empty parts".
+def _read_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
+    return unpack("<i", b_io.read(4))[0]
 
-    @staticmethod
-    def _read_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
-        return unpack("<i", b_io.read(4))[0]
 
-    @staticmethod
-    def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveParts) -> int:
-        return b_io.write(pack("<i", len(s.parts)))
+def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s: Shape) -> int:
+    return b_io.write(pack("<i", len(s.parts)))
 
-    @staticmethod
-    def _read_parts_from_byte_stream(
-        b_io: ReadableBinStream, nParts: int
-    ) -> _Array[int]:
-        return _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
-    @staticmethod
-    def _write_part_indices_to_byte_stream(
-        b_io: WriteableBinStream, s: _CanHaveParts
-    ) -> int:
-        return b_io.write(pack(f"<{len(s.parts)}i", *s.parts))
+def _read_parts_from_byte_stream(b_io: ReadableBinStream, nParts: int) -> _Array[int]:
+    return _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
+
+
+def _write_part_indices_to_byte_stream(b_io: WriteableBinStream, s: Shape) -> int:
+    return b_io.write(pack(f"<{len(s.parts)}i", *s.parts))
 
 
 Point_shapeTypes = frozenset([POINT, POINTM, POINTZ])
@@ -1324,75 +1274,76 @@ class Point(Shape):
     ):
         Shape.__init__(self, points=[(x, y)], oid=oid)
 
-    @staticmethod
-    def _x_y_from_byte_stream(b_io: ReadableBinStream):
-        # Unpack _Array too
-        x, y = unpack("<2d", b_io.read(16))
-        # Convert to tuple
-        return x, y
 
-    @staticmethod
-    def _write_x_y_to_byte_stream(
-        b_io: WriteableBinStream, x: float, y: float, i: int
-    ) -> int:
-        try:
-            return b_io.write(pack("<2d", x, y))
-        except error:
-            raise ShapefileException(
-                f"Failed to write point for record {i}. Expected floats."
-            )
+def _x_y_from_byte_stream(b_io: ReadableBinStream):
+    # Unpack _Array too
+    x, y = unpack("<2d", b_io.read(16))
+    # Convert to tuple
+    return x, y
 
-    @classmethod
-    def from_byte_stream(
-        cls,
-        shapeType: int,
-        b_io: ReadSeekableBinStream,
-        next_shape: int,
-        oid: Optional[int] = None,
-        bbox: Optional[BBox] = None,
-    ) -> Optional[Shape]:
-        x, y = cls._x_y_from_byte_stream(b_io)
 
-        if bbox is not None:
-            # create bounding box for Point by duplicating coordinates
-            # skip shape if no overlap with bounding box
-            if not bbox_overlap(bbox, (x, y, x, y)):
-                return None
-        elif shapeType == POINT:
-            return Point(x=x, y=y, oid=oid)
+def _write_x_y_to_byte_stream(
+    b_io: WriteableBinStream, x: float, y: float, i: int
+) -> int:
+    try:
+        return b_io.write(pack("<2d", x, y))
+    except error:
+        raise ShapefileException(
+            f"Failed to write point for record {i}. Expected floats."
+        )
 
-        if shapeType == POINTZ:
-            z = PointZ._read_single_point_zs_from_byte_stream(b_io)[0]
 
-        m = PointM._read_single_point_ms_from_byte_stream(b_io, next_shape)[0]
+def _single_point_from_byte_stream(
+    shapeType: int,
+    b_io: ReadSeekableBinStream,
+    next_shape: int,
+    oid: Optional[int] = None,
+    bbox: Optional[BBox] = None,
+) -> Optional[Shape]:
+    x, y = _x_y_from_byte_stream(b_io)
 
-        if shapeType == POINTZ:
-            return PointZ(x=x, y=y, z=z, m=m, oid=oid)
+    if bbox is not None:
+        # create bounding box for Point by duplicating coordinates
+        # skip shape if no overlap with bounding box
+        if not bbox_overlap(bbox, (x, y, x, y)):
+            return None
+    elif shapeType == POINT:
+        return Point(x=x, y=y, oid=oid)
 
-        return PointM(x=x, y=y, m=m, oid=oid)
-        # return Shape(shapeType=shapeType, points=[(x, y)], z=zs, m=ms, oid=oid)
+    if shapeType == POINTZ:
+        z = PointZ._read_single_point_zs_from_byte_stream(b_io)[0]
 
-    @staticmethod
-    def write_to_byte_stream(b_io: WriteableBinStream, s: Shape, i: int) -> int:
-        # Serialize a single point
-        x, y = s.points[0][0], s.points[0][1]
-        n = Point._write_x_y_to_byte_stream(b_io, x, y, i)
+    m = PointM._read_single_point_ms_from_byte_stream(b_io, next_shape)[0]
 
-        # Write a single Z value
-        if s.shapeType in PointZ_shapeTypes:
-            n += PointZ._write_single_point_z_to_byte_stream(b_io, s, i)
+    if shapeType == POINTZ:
+        return PointZ(x=x, y=y, z=z, m=m, oid=oid)
 
-        # Write a single M value
-        if s.shapeType in PointM_shapeTypes:
-            n += PointM._write_single_point_m_to_byte_stream(b_io, s, i)
+    return PointM(x=x, y=y, m=m, oid=oid)
+    # return Shape(shapeType=shapeType, points=[(x, y)], z=zs, m=ms, oid=oid)
 
-        return n
+
+def _write_single_point_to_byte_stream(
+    b_io: WriteableBinStream, s: Shape, i: int
+) -> int:
+    # Serialize a single point
+    x, y = s.points[0][0], s.points[0][1]
+    n = _write_x_y_to_byte_stream(b_io, x, y, i)
+
+    # Write a single Z value
+    if s.shapeType in PointZ_shapeTypes:
+        n += _write_single_point_z_to_byte_stream(b_io, s, i)
+
+    # Write a single M value
+    if s.shapeType in PointM_shapeTypes:
+        n += _write_single_point_m_to_byte_stream(b_io, s, i)
+
+    return n
 
 
 Polyline_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
 
 
-class Polyline(_CanHaveParts):
+class Polyline(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1424,7 +1375,7 @@ class Polyline(_CanHaveParts):
 Polygon_shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
 
 
-class Polygon(_CanHaveParts):
+class Polygon(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1448,7 +1399,7 @@ class Polygon(_CanHaveParts):
 MultiPoint_shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
 
 
-class MultiPoint(_CanHaveBBox):
+class MultiPoint(Shape):
     def __init__(
         self,
         *args: PointT,
@@ -1488,54 +1439,50 @@ _HasM_shapeTypes = frozenset(
 )
 
 
-class _HasM(_CanHaveBBox):
-    m: Sequence[Optional[float]]
+def _read_ms_from_byte_stream(
+    b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
+) -> tuple[MBox, list[Optional[float]]]:
+    if next_shape - b_io.tell() >= 16:
+        mbox = unpack("<2d", b_io.read(16))
+    # Measure values less than -10e38 are nodata values according to the spec
+    if next_shape - b_io.tell() >= nPoints * 8:
+        ms = []
+        for m in unpack(f"<{nPoints}d", b_io.read(nPoints * 8)):
+            if m > NODATA:
+                ms.append(m)
+            else:
+                ms.append(None)
+    else:
+        ms = [None for _ in range(nPoints)]
+    return mbox, ms
 
-    @staticmethod
-    def _read_ms_from_byte_stream(
-        b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
-    ) -> tuple[MBox, list[Optional[float]]]:
-        if next_shape - b_io.tell() >= 16:
-            mbox = unpack("<2d", b_io.read(16))
-        # Measure values less than -10e38 are nodata values according to the spec
-        if next_shape - b_io.tell() >= nPoints * 8:
-            ms = []
-            for m in unpack(f"<{nPoints}d", b_io.read(nPoints * 8)):
-                if m > NODATA:
-                    ms.append(m)
-                else:
-                    ms.append(None)
-        else:
-            ms = [None for _ in range(nPoints)]
-        return mbox, ms
 
-    @staticmethod
-    def _write_ms_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int, mbox: Optional[MBox]
-    ) -> int:
-        if not mbox or len(mbox) != 2:
-            raise ShapefileException(f"Two numbers required for mbox. Got: {mbox}")
-        # Write m extremes and values
-        # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
-        # Note: missing m values are autoset to NODATA.
-        try:
-            num_bytes_written = b_io.write(pack("<2d", *mbox))
-        except error:
-            raise ShapefileException(
-                f"Failed to write measure extremes for record {i}. Expected floats"
-            )
-        try:
-            ms = cast(_HasM, s).m
+def _write_ms_to_byte_stream(
+    b_io: WriteableBinStream, s: Shape, i: int, mbox: Optional[MBox]
+) -> int:
+    if not mbox or len(mbox) != 2:
+        raise ShapefileException(f"Two numbers required for mbox. Got: {mbox}")
+    # Write m extremes and values
+    # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
+    # Note: missing m values are autoset to NODATA.
+    try:
+        num_bytes_written = b_io.write(pack("<2d", *mbox))
+    except error:
+        raise ShapefileException(
+            f"Failed to write measure extremes for record {i}. Expected floats"
+        )
+    try:
+        ms = s.m
 
-            ms_to_encode = [m if m is not None else NODATA for m in ms]
+        ms_to_encode = [m if m is not None else NODATA for m in ms]
 
-            num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
-        except error:
-            raise ShapefileException(
-                f"Failed to write measure values for record {i}. Expected floats"
-            )
+        num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
+    except error:
+        raise ShapefileException(
+            f"Failed to write measure values for record {i}. Expected floats"
+        )
 
-        return num_bytes_written
+    return num_bytes_written
 
 
 # Not a PointZ
@@ -1549,46 +1496,42 @@ _HasZ_shapeTypes = frozenset(
 )
 
 
-class _HasZ(_CanHaveBBox):
-    z: Sequence[float]
+def _read_zs_from_byte_stream(
+    b_io: ReadableBinStream, nPoints: int
+) -> tuple[ZBox, Sequence[float]]:
+    zbox = unpack("<2d", b_io.read(16))
+    return zbox, _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
-    @staticmethod
-    def _read_zs_from_byte_stream(
-        b_io: ReadableBinStream, nPoints: int
-    ) -> tuple[ZBox, Sequence[float]]:
-        zbox = unpack("<2d", b_io.read(16))
-        return zbox, _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
-    @staticmethod
-    def _write_zs_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int, zbox: Optional[ZBox]
-    ) -> int:
-        if not zbox or len(zbox) != 2:
-            raise ShapefileException(f"Two numbers required for zbox. Got: {zbox}")
+def _write_zs_to_byte_stream(
+    b_io: WriteableBinStream, s: Shape, i: int, zbox: Optional[ZBox]
+) -> int:
+    if not zbox or len(zbox) != 2:
+        raise ShapefileException(f"Two numbers required for zbox. Got: {zbox}")
 
-        # Write z extremes and values
-        # Note: missing z values are autoset to 0, but not sure if this is ideal.
-        try:
-            num_bytes_written = b_io.write(pack("<2d", *zbox))
-        except error:
-            raise ShapefileException(
-                f"Failed to write elevation extremes for record {i}. Expected floats."
-            )
-        try:
-            zs = cast(_HasZ, s).z
-            num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
-        except error:
-            raise ShapefileException(
-                f"Failed to write elevation values for record {i}. Expected floats."
-            )
+    # Write z extremes and values
+    # Note: missing z values are autoset to 0, but not sure if this is ideal.
+    try:
+        num_bytes_written = b_io.write(pack("<2d", *zbox))
+    except error:
+        raise ShapefileException(
+            f"Failed to write elevation extremes for record {i}. Expected floats."
+        )
+    try:
+        zs = s.z
+        num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
+    except error:
+        raise ShapefileException(
+            f"Failed to write elevation values for record {i}. Expected floats."
+        )
 
-        return num_bytes_written
+    return num_bytes_written
 
 
 MultiPatch_shapeTypes = frozenset([MULTIPATCH])
 
 
-class MultiPatch(_HasM, _HasZ, _CanHaveParts):
+class MultiPatch(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1626,15 +1569,15 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
             oid=oid,
         )
 
-    @staticmethod
-    def _read_part_types_from_byte_stream(
-        b_io: ReadableBinStream, nParts: int
-    ) -> Sequence[int]:
-        return _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
-    @staticmethod
-    def _write_part_types_to_byte_stream(b_io: WriteableBinStream, s: Shape) -> int:
-        return b_io.write(pack(f"<{len(s.partTypes)}i", *s.partTypes))
+def _read_part_types_from_byte_stream(
+    b_io: ReadableBinStream, nParts: int
+) -> Sequence[int]:
+    return _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
+
+
+def _write_part_types_to_byte_stream(b_io: WriteableBinStream, s: Shape) -> int:
+    return b_io.write(pack(f"<{len(s.partTypes)}i", *s.partTypes))
 
 
 PointM_shapeTypes = frozenset([POINTM, POINTZ])
@@ -1652,42 +1595,41 @@ class PointM(Point):
     ):
         Shape.__init__(self, points=[(x, y)], m=(m,), oid=oid)
 
-    @staticmethod
-    def _read_single_point_ms_from_byte_stream(
-        b_io: ReadSeekableBinStream, next_shape: int
-    ) -> tuple[Optional[float]]:
-        if next_shape - b_io.tell() >= 8:
-            (m,) = unpack("<d", b_io.read(8))
-        else:
-            m = NODATA
-        # Measure values less than -10e38 are nodata values according to the spec
-        if m > NODATA:
-            return (m,)
-        else:
-            return (None,)
 
-    @staticmethod
-    def _write_single_point_m_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int
-    ) -> int:
-        try:
-            s = cast(_HasM, s)
-            m = s.m[0] if s.m else None
-        except error:
-            raise ShapefileException(
-                f"Failed to write measure value for record {i}. Expected floats."
-            )
+def _read_single_point_ms_from_byte_stream(
+    b_io: ReadSeekableBinStream, next_shape: int
+) -> tuple[Optional[float]]:
+    if next_shape - b_io.tell() >= 8:
+        (m,) = unpack("<d", b_io.read(8))
+    else:
+        m = NODATA
+    # Measure values less than -10e38 are nodata values according to the spec
+    if m > NODATA:
+        return (m,)
+    else:
+        return (None,)
 
-        # Note: missing m values are autoset to NODATA.
-        m_to_encode = m if m is not None else NODATA
 
-        return b_io.write(pack("<1d", m_to_encode))
+def _write_single_point_m_to_byte_stream(
+    b_io: WriteableBinStream, s: Shape, i: int
+) -> int:
+    try:
+        m = s.m[0] if s.m else None
+    except error:
+        raise ShapefileException(
+            f"Failed to write measure value for record {i}. Expected floats."
+        )
+
+    # Note: missing m values are autoset to NODATA.
+    m_to_encode = m if m is not None else NODATA
+
+    return b_io.write(pack("<1d", m_to_encode))
 
 
 PolylineM_shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
 
 
-class PolylineM(Polyline, _HasM):
+class PolylineM(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1723,7 +1665,7 @@ class PolylineM(Polyline, _HasM):
 PolygonM_shapeTypes = frozenset([POLYGONM, POLYGONZ])
 
 
-class PolygonM(Polygon, _HasM):
+class PolygonM(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1759,7 +1701,7 @@ class PolygonM(Polygon, _HasM):
 MultiPointM_shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
 
 
-class MultiPointM(MultiPoint, _HasM):
+class MultiPointM(Shape):
     def __init__(
         self,
         *args: PointT,
@@ -1792,7 +1734,7 @@ class MultiPointM(MultiPoint, _HasM):
 PointZ_shapeTypes = frozenset([POINTZ])
 
 
-class PointZ(PointM):
+class PointZ(Shape):
     def __init__(
         self,
         x: float,
@@ -1806,33 +1748,33 @@ class PointZ(PointM):
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
-    @staticmethod
-    def _read_single_point_zs_from_byte_stream(b_io: ReadableBinStream) -> tuple[float]:
-        return unpack("<d", b_io.read(8))
 
-    @staticmethod
-    def _write_single_point_z_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int
-    ) -> int:
-        # Note: missing z values are autoset to 0, but not sure if this is ideal.
-        z: float = 0.0
-        # then write value
+def _read_single_point_zs_from_byte_stream(b_io: ReadableBinStream) -> tuple[float]:
+    return unpack("<d", b_io.read(8))
 
-        try:
-            if s.z:
-                z = s.z[0]
-        except error:
-            raise ShapefileException(
-                f"Failed to write elevation value for record {i}. Expected floats."
-            )
 
-        return b_io.write(pack("<d", z))
+def _write_single_point_z_to_byte_stream(
+    b_io: WriteableBinStream, s: Shape, i: int
+) -> int:
+    # Note: missing z values are autoset to 0, but not sure if this is ideal.
+    z: float = 0.0
+    # then write value
+
+    try:
+        if s.z:
+            z = s.z[0]
+    except error:
+        raise ShapefileException(
+            f"Failed to write elevation value for record {i}. Expected floats."
+        )
+
+    return b_io.write(pack("<d", z))
 
 
 PolylineZ_shapeTypes = frozenset([POLYLINEZ])
 
 
-class PolylineZ(PolylineM, _HasZ):
+class PolylineZ(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1872,7 +1814,7 @@ class PolylineZ(PolylineM, _HasZ):
 PolygonZ_shapeTypes = frozenset([POLYGONZ])
 
 
-class PolygonZ(PolygonM, _HasZ):
+class PolygonZ(Shape):
     def __init__(
         self,
         *args: PointsT,
@@ -1912,7 +1854,7 @@ class PolygonZ(PolygonM, _HasZ):
 MultiPointZ_shapeTypes = frozenset([MULTIPOINTZ])
 
 
-class MultiPointZ(MultiPointM, _HasZ):
+class MultiPointZ(Shape):
     def __init__(
         self,
         *args: PointT,
@@ -1946,7 +1888,65 @@ class MultiPointZ(MultiPointM, _HasZ):
         )
 
 
-SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]]] = {
+_CanHaveBBox_shapeTypes = frozenset(
+    [
+        POLYLINE,
+        POLYLINEM,
+        POLYLINEZ,
+        MULTIPOINT,
+        MULTIPOINTM,
+        MULTIPOINTZ,
+        POLYGON,
+        POLYGONM,
+        POLYGONZ,
+        MULTIPATCH,
+    ]
+)
+_CanHaveBBoxT = Union[
+    Polyline,
+    PolylineM,
+    PolylineZ,
+    MultiPoint,
+    MultiPointM,
+    MultiPointZ,
+    Polygon,
+    PolygonM,
+    PolygonZ,
+    MultiPatch,
+]
+
+
+def _write_shape_to_byte_stream(
+    b_io: WriteableBinStream,
+    s: Shape,
+    i: int,
+) -> int:
+    if s.shapeType == NULL:
+        return _write_null_shape_to_byte_stream(b_io, s, i)
+
+    if s.shapeType in Point_shapeTypes:
+        return _write_single_point_to_byte_stream(b_io, s, i)
+
+    return _write_non_single_point_shape_to_byte_stream(b_io, s, i)
+
+
+def _shape_from_byte_stream(
+    shapeType: int,
+    b_io: ReadSeekableBinStream,
+    next_shape: int,
+    oid: Optional[int] = None,
+    bbox: Optional[BBox] = None,
+) -> Shape:
+    if shapeType == NULL:
+        return _null_shape_from_byte_stream(shapeType, b_io, next_shape, oid, bbox)
+
+    if shapeType in Point_shapeTypes:
+        return _single_point_from_byte_stream(shapeType, b_io, next_shape, oid, bbox)
+
+    return _non_single_point_shape_from_byte_stream(shapeType, b_io, next_shape, oid, bbox)
+
+
+SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Shape]] = {
     NULL: NullShape,
     POINT: Point,
     POLYLINE: Polyline,
@@ -2680,8 +2680,7 @@ class Reader:
 
         shapeType = unpack("<i", b_io.read(4))[0]
 
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-        shape = ShapeClass.from_byte_stream(
+        shape = _shape_from_byte_stream(
             shapeType, b_io, recLength_bytes, oid=oid, bbox=bbox
         )
 
@@ -3383,7 +3382,7 @@ class Writer:
             # first time bbox is being set
             self._bbox = shape_bbox
 
-    def _update_file_zbox(self, s: Union[_HasZ, PointZ]):
+    def _update_file_zbox(self, s: Shape):
         if self._zbox:
             # compare with existing
             self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
@@ -3391,7 +3390,7 @@ class Writer:
             # first time zbox is being set
             self._zbox = s.zbox
 
-    def _update_file_mbox(self, s: Union[_HasM, PointM]):
+    def _update_file_mbox(self, s: Shape):
         mbox = s.mbox
         if self._mbox:
             # compare with existing
@@ -3584,10 +3583,10 @@ class Writer:
             self._update_file_bbox(s)
 
         if s.shapeType in PointM_shapeTypes | _HasM_shapeTypes:
-            self._update_file_mbox(cast(Union[_HasM, PointM], s))
+            self._update_file_mbox(s)
 
         if s.shapeType in PointZ_shapeTypes | _HasZ_shapeTypes:
-            self._update_file_zbox(cast(Union[_HasZ, PointZ], s))
+            self._update_file_zbox(s)
 
         # Create an in-memory binary buffer to avoid
         # unnecessary seeks to files on disk
@@ -3605,8 +3604,7 @@ class Writer:
 
         n += b_io.write(pack("<i", s.shapeType))
 
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
-        n += ShapeClass.write_to_byte_stream(
+        n += _write_shape_to_byte_stream(
             b_io=b_io,
             s=s,
             i=self.shpNum,
