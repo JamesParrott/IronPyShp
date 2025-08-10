@@ -12,6 +12,7 @@ __version__ = "3.0.0"
 
 import array
 import doctest
+import enum
 import io
 import logging
 import os
@@ -163,35 +164,46 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, PathLike[Any], IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
-FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
+class FieldType(enum.Enum):
+    C = "Character"  # (str)
+    D = "Date"
+    F = "Floating point"
+    L = "Logical"  # (bool)
+    M = "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
+    N = "Numeric"  # (int)
+
+FieldTypeT = FieldType
+
+# FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 
 
 # https://en.wikipedia.org/wiki/.dbf#Database_records
-class FieldType:
-    """A bare bones 'enum', as the enum library noticeably slows performance."""
+# class FieldType:
+#     """A bare bones 'enum', as the enum library noticeably slows performance."""
 
-    C: Final = "C"  # "Character"  # (str)
-    D: Final = "D"  # "Date"
-    F: Final = "F"  # "Floating point"
-    L: Final = "L"  # "Logical"  # (bool)
-    M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
-    N: Final = "N"  # "Numeric"  # (int)
-    __members__: set[FieldTypeT] = {
-        "C",
-        "D",
-        "F",
-        "L",
-        "M",
-        "N",
-    }
+#     C: Final = "C"  # "Character"  # (str)
+#     D: Final = "D"  # "Date"
+#     F: Final = "F"  # "Floating point"
+#     L: Final = "L"  # "Logical"  # (bool)
+#     M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
+#     N: Final = "N"  # "Numeric"  # (int)
+#     __members__: set[FieldTypeT] = {
+#         "C",
+#         "D",
+#         "F",
+#         "L",
+#         "M",
+#         "N",
+#     }
 
 
 FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
-for c in FieldType.__members__:
-    FIELD_TYPE_ALIASES[c.upper()] = c
-    FIELD_TYPE_ALIASES[c.lower()] = c
-    FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
-    FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
+for c, v in FieldType.__members__.items():
+    FIELD_TYPE_ALIASES[v] = v
+    FIELD_TYPE_ALIASES[c.upper()] = v
+    FIELD_TYPE_ALIASES[c.lower()] = v
+    FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = v
+    FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = v
 
 
 # Use functional syntax to have an attribute named type, a Python keyword
@@ -230,7 +242,8 @@ class Field(NamedTuple):
         )
 
     def __repr__(self) -> str:
-        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
+        # return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
+        return f'Field(name="{self.name}", field_type={self.field_type}, size={self.size}, decimal={self.decimal})'
 
 
 RecordValueNotDate = Union[bool, int, float, str]
@@ -3578,7 +3591,7 @@ class Writer:
             encoded_name = field.name.encode(self.encoding, self.encodingErrors)
             encoded_name = encoded_name.replace(b" ", b"_")
             encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = field.field_type.encode("ascii")
+            encodedFieldType = field.field_type.name.encode("ascii")
             fld = pack(
                 "<11sc4xBB14x",
                 encoded_name,
@@ -3749,7 +3762,7 @@ class Writer:
             # when their Field instance was created and added to self.fields
             str_val: Optional[str] = None
 
-            if fieldType in ("N", "F"):
+            if fieldType is FieldType.N or fieldType is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 if value in MISSING:
                     str_val = "*" * size  # QGIS NULL
@@ -3771,7 +3784,7 @@ class Writer:
                     str_val = format(f_val, f".{deci}f")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
-            elif fieldType == "D":
+            elif fieldType is FieldType.D:
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, date):
                     str_val = f"{value.year:04d}{value.month:02d}{value.day:02d}"
@@ -3785,7 +3798,7 @@ class Writer:
                     raise ShapefileException(
                         "Date values must be either a datetime.date object, a list, a YYYYMMDD string, or a missing value."
                     )
-            elif fieldType == "L":
+            elif fieldType is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value in MISSING:
                     str_val = " "  # missing is set to space
