@@ -197,7 +197,7 @@ FieldTypeT = FieldType
 #     }
 
 
-FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
+FIELD_TYPE_ALIASES: dict[Union[str, bytes, FieldType], FieldTypeT] = {}
 for c, v in FieldType.__members__.items():
     FIELD_TYPE_ALIASES[v] = v
     FIELD_TYPE_ALIASES[c.upper()] = v
@@ -3954,7 +3954,7 @@ class Writer:
         # Types of args should match *Field
         self,
         name: str,
-        field_type: FieldTypeT = "C",
+        field_type: FieldTypeT = FieldType.C,
         size: int = 50,
         decimal: int = 0,
     ) -> None:
