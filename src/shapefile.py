@@ -164,6 +164,7 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, PathLike[Any], IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
+
 class FieldType(enum.Enum):
     C = "Character"  # (str)
     D = "Date"
@@ -171,6 +172,7 @@ class FieldType(enum.Enum):
     L = "Logical"  # (bool)
     M = "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
     N = "Numeric"  # (int)
+
 
 FieldTypeT = FieldType
 
