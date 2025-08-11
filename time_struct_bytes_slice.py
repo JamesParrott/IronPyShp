@@ -17,12 +17,12 @@ total_length = sum(lengths)
 data = [bytes(random.randint(0,255) for __ in range(length)) for length in lengths]
 
 
-buffer = bytearray(b"".join(data))
+buffer = memoryview(b"".join(data))
 
 def unpack_via_slicing():
     start = 0
     for variable, end in zip(data, cumulative_lengths):
-        assert buffer[start:end] == variable
+        assert bytes(buffer[start:end]) == variable
         start = end
 
 
