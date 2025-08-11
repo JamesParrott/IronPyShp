@@ -2987,12 +2987,13 @@ class Reader:
         recLookup: dict[str, int],
         recStruct: Struct,
         oid: Optional[int] = None,
+        f = None,
     ) -> Optional[_Record]:
         """Reads and returns a dbf record row as a list of values. Requires specifying
         a list of field info Field namedtuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
         """
-        f = self.__getFileObj(self.dbf)
+        f = f or self.__getFileObj(self.dbf)
 
         # The only format chars in from self.__recordFmt, in recStruct from __recordFields,
         # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes
@@ -3144,7 +3145,7 @@ class Reader:
             raise ShapefileException(
                 "Error when reading number of Records in dbf file header"
             )
-        f = self.__getFileObj(self.dbf)
+        f = io.BytesIO(self.__getFileObj(self.dbf).read())
         start = self.__restrictIndex(start)
         if stop is None:
             stop = self.numRecords
@@ -3159,7 +3160,7 @@ class Reader:
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
         for i in range(start, stop):
             r = self.__record(
-                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
+                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct, f = f,
             )
             if r:
                 yield r
