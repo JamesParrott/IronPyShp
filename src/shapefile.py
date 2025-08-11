@@ -3145,7 +3145,10 @@ class Reader:
             raise ShapefileException(
                 "Error when reading number of Records in dbf file header"
             )
-        f = io.BytesIO(self.__getFileObj(self.dbf).read())
+        dbf = self.__getFileObj(self.dbf)
+        dbf.seek(0)
+        f = io.BytesIO(dbf.read())
+        f.seek(0)
         start = self.__restrictIndex(start)
         if stop is None:
             stop = self.numRecords
