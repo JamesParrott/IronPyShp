@@ -2981,13 +2981,13 @@ class Reader:
             recLookup = self.__fullRecLookup
         return fieldTuples, recLookup, recStruct
 
-    def __record(
+    def __record_values(
         self,
         fieldTuples: list[Field],
-        recLookup: dict[str, int],
+        # recLookup: dict[str, int],
         recStruct: Struct,
-        oid: Optional[int] = None,
-    ) -> Optional[_Record]:
+        # oid: Optional[int] = None,
+    ) -> Iterator[RecordValue]: # Optional[_Record]:
         """Reads and returns a dbf record row as a list of values. Requires specifying
         a list of field info Field namedtuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
@@ -3015,7 +3015,7 @@ class Reader:
             )
 
         # parse each value
-        record = _Record(field_positions = recLookup, values=[], oid=oid)
+        # record = _Record(field_positions = recLookup, values=[], oid=oid)
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
             if typ is FieldType.N or typ is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
@@ -3077,9 +3077,10 @@ class Reader:
                 value = value.strip().rstrip(
                     "\x00"
                 )  # remove null-padding at end of strings
-            record.append(value)
+            yield value
+            # record.append(value)
 
-        return record
+        # return record
 
     def record(
         self, i: int = 0, fields: Optional[list[str]] = None
@@ -3096,9 +3097,10 @@ class Reader:
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
-        return self.__record(
-            oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
+        rec_vals = self.__record_values(
+            fieldTuples=fieldTuples, recStruct=recStruct
         )
+        return _Record(field_positions = recLookup, values= rec_vals, oid=i)
 
     def records(self, fields: Optional[list[str]] = None) -> list[_Record]:
         """Returns all records in a dbf file.
@@ -3114,9 +3116,11 @@ class Reader:
         # self.__dbfHeader() sets self.numRecords, so it's fine to cast it to int
         # (to tell mypy it's not None).
         for i in range(cast(int, self.numRecords)):
-            r = self.__record(
-                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
+
+            rec_vals = self.__record_values(
+                fieldTuples=fieldTuples, recStruct=recStruct
             )
+            r = _Record(field_positions = recLookup, values= rec_vals, oid=i)
             if r:
                 records.append(r)
         return records
@@ -3158,9 +3162,11 @@ class Reader:
         f.seek(self.__dbfHdrLength + (start * recSize))
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
         for i in range(start, stop):
-            r = self.__record(
-                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
+
+            rec_vals = self.__record_values(
+                fieldTuples=fieldTuples, recStruct=recStruct
             )
+            r = _Record(field_positions = recLookup, values= rec_vals, oid=i)
             if r:
                 yield r
 
