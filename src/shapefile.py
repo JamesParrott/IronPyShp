@@ -3015,7 +3015,7 @@ class Reader:
             )
 
         # parse each value
-        record = []
+        record = _Record(field_positions = recLookup, values=[], oid=oid)
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
             if typ is FieldType.N or typ is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
@@ -3079,7 +3079,7 @@ class Reader:
                 )  # remove null-padding at end of strings
             record.append(value)
 
-        return _Record(recLookup, record, oid)
+        return record
 
     def record(
         self, i: int = 0, fields: Optional[list[str]] = None
