@@ -53,9 +53,12 @@ shapeRecords = collections.defaultdict(list)
 
 def open_shapefile_with_PyShp(target: Union[str, PathLike]):
     with shapefile.Reader(target) as r:
-        fields[target] = r.fields
-        for shapeRecord in r.iterShapeRecords():
-            shapeRecords[target].append(shapeRecord)
+
+        list(r.iterRecords())
+        # r.records()
+        # fields[target] = r.fields
+        # for shapeRecord in r.iterShapeRecords():
+        #     shapeRecords[target].append(shapeRecord)
 
 
 def write_shapefile_with_PyShp(target: Union[str, PathLike]):
@@ -89,7 +92,7 @@ reader_benchmarks = [
         name=f"Read {test_name}",
         func=functools.partial(open_shapefile_with_PyShp, target=target),
     )
-    for test_name, target in SHAPEFILES.items()
+    for test_name, target in [("States_35MB", states_provinces_file)] #SHAPEFILES.items()
 ]
 
 # Require fields and shapeRecords to first have been populated
@@ -121,5 +124,5 @@ def run(run_count: int, benchmarks: list[Callable[[], None]]) -> None:
 if __name__ == "__main__":
     print("Reader tests:")
     run(1, reader_benchmarks)  # type: ignore [arg-type]
-    print("\n\nWriter tests:")
-    run(1, writer_benchmarks)  # type: ignore [arg-type]
+    # print("\n\nWriter tests:")
+    # run(1, writer_benchmarks)  # type: ignore [arg-type]
