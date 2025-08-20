@@ -10,6 +10,11 @@ from __future__ import annotations
 
 __version__ = "3.0.1"
 
+x = 4
+match x:
+    case 4:
+        pass
+        
 import array
 import doctest
 import io
