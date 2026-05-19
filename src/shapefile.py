@@ -38,7 +38,6 @@ from typing import (
     SupportsIndex,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -116,10 +115,10 @@ Point3D = tuple[float, float, float]
 PointMT = tuple[float, float, Optional[float]]
 PointZT = tuple[float, float, float, Optional[float]]
 
-Coord = Union[Point2D, Point3D]
+Coord = Point2D | Point3D
 Coords = list[Coord]
 
-PointT = Union[Point2D, PointMT, PointZT]
+PointT = Point2D | PointMT | PointZT
 PointsT = list[PointT]
 
 BBox = tuple[float, float, float, float]
@@ -155,8 +154,8 @@ class ReadWriteSeekableBinStream(Protocol):
 
 
 # File name, file object or anything with a read() method that returns bytes.
-BinaryFileT = Union[str, PathLike[Any], IO[bytes]]
-BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
+BinaryFileT = str | PathLike[Any] | IO[bytes]
+BinaryFileStreamT = IO[bytes] | io.BytesIO | WriteSeekableBinStream
 
 FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 
@@ -228,10 +227,10 @@ class Field(NamedTuple):
         return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
 
 
-RecordValueNotDate = Union[bool, int, float, str]
+RecordValueNotDate = bool | int | float | str
 
 # A Possible value in a Shapefile dbf record, i.e. L, N, M, F, C, or D types
-RecordValue = Union[RecordValueNotDate, date]
+RecordValue = RecordValueNotDate | date
 
 
 class HasGeoInterface(Protocol):
@@ -278,14 +277,14 @@ class GeoJSONMultiPolygon(TypedDict):
     coordinates: list[list[PointsT]]
 
 
-GeoJSONHomogeneousGeometryObject = Union[
-    GeoJSONPoint,
-    GeoJSONMultiPoint,
-    GeoJSONLineString,
-    GeoJSONMultiLineString,
-    GeoJSONPolygon,
-    GeoJSONMultiPolygon,
-]
+GeoJSONHomogeneousGeometryObject = (
+    GeoJSONPoint |
+    GeoJSONMultiPoint |
+    GeoJSONLineString |
+    GeoJSONMultiLineString |
+    GeoJSONPolygon |
+    GeoJSONMultiPolygon
+)
 
 GEOJSON_TO_SHAPETYPE: dict[str, int] = {
     "Null": NULL,
@@ -304,7 +303,7 @@ class GeoJSONGeometryCollection(TypedDict):
 
 
 # RFC7946 3.1
-GeoJSONObject = Union[GeoJSONHomogeneousGeometryObject, GeoJSONGeometryCollection]
+GeoJSONObject = GeoJSONHomogeneousGeometryObject | GeoJSONGeometryCollection
 
 
 class GeoJSONFeature(TypedDict):
@@ -787,11 +786,11 @@ class Shape:
             self.m: Sequence[float | None] = m
         elif self.shapeType in _HasM_shapeTypes:
             mpos = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
-            points_m_z = cast(Union[list[PointMT], list[PointZT]], self.points)
+            points_m_z = cast(list[PointMT] | list[PointZT], self.points)
             self.m = list(_ms_from_points(points_m_z, mpos))
         elif self.shapeType in PointM_shapeTypes:
             mpos = 3 if self.shapeType == POINTZ else 2
-            point_m_z = cast(Union[PointMT, PointZT], self.points[0])
+            point_m_z = cast(PointMT | PointZT, self.points[0])
             self.m = (_m_from_point(point_m_z, mpos),)
         else:
             ms_found = False
@@ -2516,7 +2515,7 @@ class Reader:
                 return
 
         if shp is not _NO_SHP_SENTINEL:
-            shp = cast(Union[str, PathLike[Any], IO[bytes], None], shp)
+            shp = cast(BinaryFileT | None, shp)
             self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
             self.shx = self.__seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
 
@@ -3736,10 +3735,10 @@ class Writer:
             self._update_file_bbox(s)
 
         if s.shapeType in PointM_shapeTypes | _HasM_shapeTypes:
-            self._update_file_mbox(cast(Union[_HasM, PointM], s))
+            self._update_file_mbox(cast(_HasM | PointM, s))
 
         if s.shapeType in PointZ_shapeTypes | _HasZ_shapeTypes:
-            self._update_file_zbox(cast(Union[_HasZ, PointZ], s))
+            self._update_file_zbox(cast(_HasZ | PointZ, s))
 
         # Create an in-memory binary buffer to avoid
         # unnecessary seeks to files on disk
