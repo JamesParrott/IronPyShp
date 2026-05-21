@@ -1148,8 +1148,7 @@ class _CanHaveBBox(Shape):
     @staticmethod
     def _read_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
         (nPoints,) = unpack("<i", b_io.read(4))
-        # return cast(int, nPoints)
-        return nPoints
+        return cast(int, nPoints)
 
     @staticmethod
     def _write_npoints_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveBBox) -> int:
@@ -1295,8 +1294,7 @@ class _CanHaveParts(_CanHaveBBox):
     @staticmethod
     def _read_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
         (nParts,) = unpack("<i", b_io.read(4))
-        # return cast(int, nParts)
-        return nParts
+        return cast(int, nParts)
 
     @staticmethod
     def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveParts) -> int:
@@ -2046,11 +2044,11 @@ class _Record(list[RecordValue]):
             raise AttributeError(f"{key} is not a field name")
 
     @overload
-    def __getitem__(self, i: SupportsIndex) -> RecordValue: ...
+    def __getitem__(self, item: SupportsIndex) -> RecordValue: ...
     @overload
-    def __getitem__(self, s: slice) -> list[RecordValue]: ...
+    def __getitem__(self, item: slice) -> list[RecordValue]: ...
     @overload
-    def __getitem__(self, s: str) -> RecordValue: ...
+    def __getitem__(self, item: str) -> RecordValue: ...
     def __getitem__(
         self, item: SupportsIndex | slice | str
     ) -> RecordValue | list[RecordValue]:
@@ -2575,8 +2573,8 @@ class DbfReader:
                         y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
                         value = date(y, m, d)
                     except (TypeError, ValueError):
-                        # if invalid date, just return as unicode string so user can decimalde
-                        value = str(value).strip()
+                        # if invalid date, just return as unicode string so user can decide
+                        value = str(value.strip())
             elif typ is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
