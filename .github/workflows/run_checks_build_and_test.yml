@@ -61,7 +61,7 @@ jobs:
         # Install a specific version of uv.
         version: "0.11.15"
     - name: Run ty
-      uses: uvx ty check src/shapefile.py
+      run: uvx ty check src/shapefile.py
 
 
   mypy-strict:

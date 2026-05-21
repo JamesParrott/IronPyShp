@@ -1148,7 +1148,8 @@ class _CanHaveBBox(Shape):
     @staticmethod
     def _read_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
         (nPoints,) = unpack("<i", b_io.read(4))
-        return cast(int, nPoints)
+        # return cast(int, nPoints)
+        return nPoints
 
     @staticmethod
     def _write_npoints_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveBBox) -> int:
@@ -1294,7 +1295,8 @@ class _CanHaveParts(_CanHaveBBox):
     @staticmethod
     def _read_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
         (nParts,) = unpack("<i", b_io.read(4))
-        return cast(int, nParts)
+        # return cast(int, nParts)
+        return nParts
 
     @staticmethod
     def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveParts) -> int:
@@ -2574,7 +2576,7 @@ class DbfReader:
                         value = date(y, m, d)
                     except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decimalde
-                        value = str(value.strip())
+                        value = str(value).strip()
             elif typ is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
