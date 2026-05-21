@@ -40,6 +40,7 @@ lint = [
     "mypy",
     "pre-commit",
     "ruff",
+    "ty",
 ]
 test = [
     "pytest",

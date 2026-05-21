@@ -13,6 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
+
+    # https://github.com/astral-sh/setup-uv
+    - name: Install uv
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      with:
+        # Install a specific version of uv.
+        version: "0.11.15"
+
     - uses: actions/setup-python@v6
       with:
         python-version: "3.14"
@@ -42,6 +50,19 @@ jobs:
       #
       #
       #####################################################################
+
+  ty:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      with:
+        # Install a specific version of uv.
+        version: "0.11.15"
+    - name: Run ty
+      uses: uvx ty check src/shapefile.py
+
 
   mypy-strict:
     runs-on: ubuntu-latest
