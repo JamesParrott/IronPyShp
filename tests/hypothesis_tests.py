@@ -6,6 +6,7 @@ from hypothesis.strategies import (
     builds,
     floats,
     integers,
+    just,
     none,
     one_of,
 )
@@ -19,6 +20,14 @@ pointMs = builds(
     shp.PointM,
     float_nums,
     float_nums,
+    one_of(none(), float_nums),
+    one_of(none(), integers()),
+)
+pointZs = builds(
+    shp.PointZ,
+    float_nums,
+    float_nums,
+    one_of(just(0.0), float_nums),
     one_of(none(), float_nums),
     one_of(none(), integers()),
 )
@@ -65,5 +74,29 @@ def test_Point_M_roundtrips(
     )
     assert isinstance(actual, shp.PointM)
     assert actual.points == expected.points
+    assert actual.m == expected.m
+    assert actual.oid == expected.oid
+
+
+@pytest.mark.hypothesis
+@given(expected=pointZs, i=integers(min_value=1))
+def test_Point_Z_roundtrips(
+    expected: shp.Point,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.PointZ.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.PointZ.from_byte_stream(
+        shapeType=shp.POINTZ,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.PointM)
+    assert actual.points == expected.points
+    assert actual.z == expected.z
     assert actual.m == expected.m
     assert actual.oid == expected.oid
