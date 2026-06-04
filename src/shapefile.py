@@ -775,7 +775,7 @@ class Shape:
         if partTypes is not None:
             self.partTypes = partTypes
 
-        default_points: PointsT = []
+        # default_points: PointsT = []
         default_parts: list[int] = []
 
         if lines is not None:
@@ -800,6 +800,18 @@ class Shape:
             # _from_geojson.
             default_parts = [0]
 
+        if not points:
+            if self.shapeType != NULL:
+                raise ShapefileException(
+                    f"Shape: {self.__class__.__name__} or shape type: {self.shapeTypeName} requires non-empty points."
+                    f" Got: {points=}"
+                )
+        elif self.shapeType == NULL:
+            raise ShapefileException(
+                f"NullShape or shape type: {self.shapeTypeName} must have zero points, or None set."
+                f" Got: {points=}"
+            )
+
         self.points: PointsT = points or default_points
 
         self.parts: Sequence[int] = parts or default_parts
@@ -812,7 +824,7 @@ class Shape:
 
         if bbox is not None:
             self.bbox: BBox = bbox
-        elif len(self.points) >= 2:
+        elif self.shapeType not in Point_shapeTypes:
             self.bbox = self._bbox_from_points()
 
         ms_found = True
@@ -846,6 +858,21 @@ class Shape:
             self.zbox: ZBox = zbox
         elif zs_found:
             self.zbox = self._zbox_from_zs()
+
+    @property
+    def oid(self) -> int:
+        """The index position of the shape in the original shapefile"""
+        return self.__oid
+
+    @property
+    def shapeTypeName(self) -> str:
+        return SHAPETYPE_LOOKUP[self.shapeType]
+
+    def __repr__(self) -> str:
+        class_name = self.__class__.__name__
+        if class_name == "Shape":
+            return f"Shape #{self.__oid}: {self.shapeTypeName}"
+        return f"{class_name} #{self.__oid}"
 
     @staticmethod
     def _ensure_polygon_rings_closed(
@@ -1079,21 +1106,6 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                     parts.append(index)
                     index += len(ext_or_hole)
         return Shape(shapeType=shapeType, points=points, parts=parts)
-
-    @property
-    def oid(self) -> int:
-        """The index position of the shape in the original shapefile"""
-        return self.__oid
-
-    @property
-    def shapeTypeName(self) -> str:
-        return SHAPETYPE_LOOKUP[self.shapeType]
-
-    def __repr__(self) -> str:
-        class_name = self.__class__.__name__
-        if class_name == "Shape":
-            return f"Shape #{self.__oid}: {self.shapeTypeName}"
-        return f"{class_name} #{self.__oid}"
 
 
 # Need unused arguments to keep the same call signature for
