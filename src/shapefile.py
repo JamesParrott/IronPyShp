@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.10"
+__version__ = "3.0.11.dev"
 
 import abc
 import array
@@ -775,7 +775,7 @@ class Shape:
         if partTypes is not None:
             self.partTypes = partTypes
 
-        # default_points: PointsT = []
+        default_points: PointsT = []
         default_parts: list[int] = []
 
         if lines is not None:
@@ -812,8 +812,9 @@ class Shape:
                 f" Got: {points=}"
             )
 
+        # PyShp 2 API compatibility requires self.points = []
+        # on NullShapes (and self.parts = []).
         self.points: PointsT = points or default_points
-
         self.parts: Sequence[int] = parts or default_parts
 
         # and a dict to silently record any errors encountered in GeoJSON
@@ -822,10 +823,8 @@ class Shape:
         # add oid
         self.__oid: int = -1 if oid is None else oid
 
-        if bbox is not None:
-            self.bbox: BBox = bbox
-        elif self.shapeType not in Point_shapeTypes:
-            self.bbox = self._bbox_from_points()
+        if self.shapeType != NULL and self.shapeType not in Point_shapeTypes:
+            self.bbox: BBox = bbox or self._bbox_from_points()
 
         ms_found = True
         if m:

@@ -4,6 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis.strategies import (
     builds,
+    composite,
     floats,
     integers,
     just,
@@ -16,25 +17,39 @@ from hypothesis.strategies import (
 import shapefile as shp
 
 float_nums = floats(allow_nan=False, allow_infinity=False)
-
-point_2D = builds(
-    shp.Point, float_nums, float_nums, one_of(none(), integers(min_value=0))
-)
+xs = float_nums
+ys = float_nums
+ms = one_of(none(), float_nums)
+zs = one_of(just(0.0), float_nums)
+PointsLengths = integers(min_value=1, max_value=100)  # length of points
+oid = one_of(none(), integers(min_value=0))
+point_2D = builds(shp.Point, x=xs, y=ys, oid=oid)
 pointM = builds(
     shp.PointM,
-    float_nums,
-    float_nums,
-    one_of(none(), float_nums),
-    one_of(none(), integers(min_value=0)),
+    x=xs,
+    y=ys,
+    m=ms,
+    oid=oid,
 )
 pointZ = builds(
     shp.PointZ,
-    float_nums,
-    float_nums,
-    one_of(just(0.0), float_nums),
-    one_of(none(), float_nums),
-    one_of(none(), integers(min_value=0)),
+    x=xs,
+    y=ys,
+    z=zs,
+    m=ms,
+    oid=oid,
 )
+
+
+def coords_2D_list(
+    min_size: int = 1,
+    max_size: int | None = None,
+):
+    return lists(
+        tuples(xs, ys),
+        min_size=min_size,
+        max_size=max_size,
+    )
 
 
 @pytest.mark.hypothesis
@@ -61,7 +76,7 @@ def test_Point_2D_roundtrips(
 
 @pytest.mark.hypothesis
 @given(expected=pointM, i=integers(min_value=1))
-def test_Point_M_roundtrips(
+def test_PointM_roundtrips(
     expected: shp.Point,
     i: int,
 ) -> None:
@@ -84,7 +99,7 @@ def test_Point_M_roundtrips(
 
 @pytest.mark.hypothesis
 @given(expected=pointZ, i=integers(min_value=1))
-def test_Point_Z_roundtrips(
+def test_PointZ_roundtrips(
     expected: shp.Point,
     i: int,
 ) -> None:
@@ -106,9 +121,7 @@ def test_Point_Z_roundtrips(
     assert actual.oid == expected.oid
 
 
-coords_2D_list = lists(tuples(float_nums, float_nums), min_size=1)
-
-multipoint = builds(shp.MultiPoint, points=coords_2D_list)
+multipoint = builds(shp.MultiPoint, points=coords_2D_list())
 
 
 @pytest.mark.hypothesis
@@ -130,4 +143,72 @@ def test_MultiPoint_roundtrips(
     )
     assert isinstance(actual, shp.MultiPoint)
     assert actual.points == expected.points
+    assert actual.oid == expected.oid
+
+
+@composite
+def multipointM(draw):
+    N = draw(PointsLengths)
+    return shp.MultiPointM(
+        points=draw(coords_2D_list(min_size=N, max_size=N)),
+        m=draw(lists(ms, min_size=N, max_size=N)),
+        oid=oid,
+    )
+
+
+@pytest.mark.hypothesis
+@given(expected=multipointM(), i=integers(min_value=1))
+def test_MultiPointM_roundtrips(
+    expected: shp.MultiPointM,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.MultiPointM.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.MultiPointM.from_byte_stream(
+        shapeType=shp.MULTIPOINTM,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.MultiPointM)
+    assert actual.points == expected.points
+    assert actual.m == expected.m
+    assert actual.oid == expected.oid
+
+
+@composite
+def multipointZ(draw):
+    N = draw(PointsLengths)
+    return shp.MultiPointZ(
+        points=draw(coords_2D_list(min_size=N, max_size=N)),
+        z=draw(lists(zs, min_size=N, max_size=N)),
+        m=draw(lists(ms, min_size=N, max_size=N)),
+        oid=oid,
+    )
+
+
+@pytest.mark.hypothesis
+@given(expected=multipointZ(), i=integers(min_value=1))
+def test_MultiPointZ_roundtrips(
+    expected: shp.MultiPointZ,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.MultiPointZ.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.MultiPointZ.from_byte_stream(
+        shapeType=shp.MULTIPOINTZ,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.MultiPointZ)
+    assert actual.points == expected.points
+    assert actual.m == expected.m
+    assert actual.z == pytest.approx(expected.z)
     assert actual.oid == expected.oid
