@@ -773,12 +773,24 @@ class Shape:
             self.shapeType = shapeType
 
         if partTypes is not None:
+            if self.shapeType != MULTIPATCH:
+                raise ShapefileException(
+                    f"Only a Multipatch shape supports partTypes, not: {self.__class__.__name__} "
+                    f" (shape type: {self.shapeTypeName}) "
+                    f"Got: {partTypes=}"
+                )
             self.partTypes = partTypes
 
         default_points: PointsT = []
         default_parts: list[int] = []
 
-        if not points and not lines:
+        if points and lines:
+            raise ShapefileException(
+                "Constructing meaningful Shapes unambiguously from both "
+                "points and lines is not supported.  Provide one only. "
+                f" Got: {points=} and {lines=}"
+            )
+        elif not points and not lines:
             if self.shapeType != NULL:
                 raise ShapefileException(
                     f"Shape: {self.__class__.__name__} or shape type: {self.shapeTypeName} "
@@ -790,6 +802,25 @@ class Shape:
                 f"NullShape or shape type: {self.shapeTypeName} "
                 "must have zero points and zero lines (or neither set, or both None). "
                 f" Got: {points=} and {lines=}"
+            )
+        elif self.shapeType in Point_shapeTypes:
+            if not points or len(points) >= 2:
+                raise ShapefileException(
+                    f"Single point Shape: {self.__class__.__name__}, shape type: {self.shapeTypeName} "
+                    "requires one or  points (and possibly a z co-ordinate and m value), not "
+                    f"lines. Got: {points=} and {lines=}"
+                )
+            if lines:
+                raise ShapefileException(
+                    f"Single point shape: {self.__class__.__name__}, shape type: {self.shapeTypeName} "
+                    f"does not support lines. Got: {lines=}"
+                )
+        elif self.shapeType in MultiPoint_shapeTypes and lines and len(lines) >= 2:
+            raise ShapefileException(
+                f"Multipoint shape: {self.__class__.__name__}, shape type: {self.shapeTypeName} "
+                f"is a single part shape, but was given multiple parts - got {lines=}. "
+                "Point clouds can be constructed from a list of list points supplied to lines "
+                "(instead of points) but only one single 'line' is supported. "
             )
 
         if lines is not None:
@@ -819,7 +850,7 @@ class Shape:
         self.points: PointsT = points or default_points
         self.parts: Sequence[int] = parts or default_parts
 
-        # and a dict to silently record any errors encountered in GeoJSON
+        # and a dict to record any captured errors encountered in GeoJSON
         self._errors: dict[str, int] = {}
 
         # add oid
@@ -842,9 +873,9 @@ class Shape:
 
         zs_found = True
         if z:
-            self.z: Sequence[float] = z
+            self.z: Sequence[float] = _Array[float]("d", z)
         elif self.shapeType in _HasZ_shapeTypes:
-            self.z = [_z_from_point(p) for p in self.points]
+            self.z = _Array[float]("d", (_z_from_point(p) for p in self.points))
         elif self.shapeType == POINTZ:
             self.z = (_z_from_point(self.points[0]),)
         else:
