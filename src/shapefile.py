@@ -778,6 +778,20 @@ class Shape:
         default_points: PointsT = []
         default_parts: list[int] = []
 
+        if not points and not lines:
+            if self.shapeType != NULL:
+                raise ShapefileException(
+                    f"Shape: {self.__class__.__name__} or shape type: {self.shapeTypeName} "
+                    "requires non-empty points or non-empty lines."
+                    f" Got: {points=} and {lines=}"
+                )
+        elif self.shapeType == NULL:
+            raise ShapefileException(
+                f"NullShape or shape type: {self.shapeTypeName} "
+                "must have zero points and zero lines (or neither set, or both None). "
+                f" Got: {points=} and {lines=}"
+            )
+
         if lines is not None:
             if self.shapeType in Polygon_shapeTypes:
                 lines = list(lines)
@@ -799,18 +813,6 @@ class Shape:
             # Alternatively single points could be given parts = [0] too, as they do if formed
             # _from_geojson.
             default_parts = [0]
-
-        if not points:
-            if self.shapeType != NULL:
-                raise ShapefileException(
-                    f"Shape: {self.__class__.__name__} or shape type: {self.shapeTypeName} requires non-empty points."
-                    f" Got: {points=}"
-                )
-        elif self.shapeType == NULL:
-            raise ShapefileException(
-                f"NullShape or shape type: {self.shapeTypeName} must have zero points, or None set."
-                f" Got: {points=}"
-            )
 
         # PyShp 2 API compatibility requires self.points = []
         # on NullShapes (and self.parts = []).
