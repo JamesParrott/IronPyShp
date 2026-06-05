@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 
 import pytest
-from hypothesis import given
+from hypothesis import given  # , settings, HealthCheck
 from hypothesis.strategies import (
     builds,
     composite,
@@ -23,7 +23,7 @@ xs = float_nums
 ys = float_nums
 ms = one_of(none(), float_nums)
 zs = one_of(just(0.0), float_nums)
-PointsLengths = integers(min_value=1, max_value=100)  # length of points
+PointsLengths = integers(min_value=1, max_value=8000)  # length of points
 oid = one_of(none(), integers(min_value=0))
 point_2D = builds(shp.Point, x=xs, y=ys, oid=oid)
 pointM = builds(
@@ -193,6 +193,7 @@ def multipointZ(draw):
 
 
 @pytest.mark.hypothesis
+# @settings(suppress_health_check=[HealthCheck.too_slow])
 @given(expected=multipointZ(), i=integers(min_value=1))
 def test_MultiPointZ_roundtrips(
     expected: shp.MultiPointZ,
@@ -212,5 +213,5 @@ def test_MultiPointZ_roundtrips(
     assert isinstance(actual, shp.MultiPointZ)
     assert actual.points == expected.points
     assert actual.m == expected.m
-    assert actual.z == pytest.approx(expected.z)
+    assert actual.z == expected.z
     assert actual.oid == expected.oid

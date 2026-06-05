@@ -1129,6 +1129,11 @@ class NullShape(Shape):
         oid: int | None = None,
         bbox: BBox | None = None,
     ) -> NullShape:
+        """In the ESRI spec, Null shapes are defined in .shp files
+        entirely by a single integer encoding shape type 0
+        (this happens in ShpWriter._shp_record, amongst the shape
+        record header code).
+        """
         # Shape.__init__ sets self.points = points or []
         return NullShape(oid=oid)
 
@@ -1138,6 +1143,7 @@ class NullShape(Shape):
         s: Shape,
         i: int,
     ) -> int:
+        """No op (see above)."""
         return 0
 
 
@@ -1615,13 +1621,13 @@ class _HasZ(_CanHaveBBox):
             num_bytes_written = b_io.write(pack("<2d", *zbox))
         except StructError:
             raise ShapefileException(
-                f"Failed to write elevation extremes for record {i}. Expected floats."
+                f"Failed to write elevation extremes (ZBox) for record {i}. Expected floats."
             )
         try:
             num_bytes_written += b_io.write(pack(f"<{len(s.z)}d", *s.z))
         except StructError:
             raise ShapefileException(
-                f"Failed to write elevation values for record {i}. Expected floats."
+                f"Failed to write elevation values (z) for record {i}. Expected floats."
             )
 
         return num_bytes_written
