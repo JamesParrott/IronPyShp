@@ -58,9 +58,14 @@ jobs:
       matrix:
         python-version: [
           "3.14",
+          "3.13",
+          "3.10",
+          "3.9",
         ]
         os: [
           "ubuntu-24.04",
+          "windows-latest",
+          "macos-latest",
         ]
     runs-on: ${{ matrix.os }}
     steps:
