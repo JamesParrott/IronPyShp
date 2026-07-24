@@ -1112,6 +1112,7 @@ class _DefaultShapeType(enum.Enum):
     to preserve old behaviour for anyone who explictly
     called Shape(shapeType=None).
     """
+
     unspecified = enum.auto()
 
 
@@ -1209,7 +1210,7 @@ class Shape:
         """
 
         # Preserve previous behaviour for anyone who set self.shapeType = None
-        if shapeType in _DefaultShapeType:
+        if isinstance(shapeType, _DefaultShapeType):
             class_name = self.__class__.__name__
             self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
         else:
@@ -3580,7 +3581,8 @@ class _NoShp(enum.Enum):
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
-    unspecified=enum.auto()
+
+    unspecified = enum.auto()
 
 
 class Reader(_HasExitStack):
@@ -3715,7 +3717,7 @@ class Reader(_HasExitStack):
             #
             return
 
-        if shp not in _NoShp:
+        if not isinstance(shp, _NoShp):
             self._shp = self._seek_0_on_file_obj_wrap_or_open_from_name(".shp", shp)
             self._shx = self._seek_0_on_file_obj_wrap_or_open_from_name(".shx", shx)
 
