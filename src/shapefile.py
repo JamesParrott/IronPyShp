@@ -202,7 +202,7 @@ BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
 
 # https://en.wikipedia.org/wiki/.dbf#Database_records
-class FieldType(enum.StrEnum):
+class FieldType(enum.Enum):
     """Previously A bare bones 'enum'.
     Restored to an Enum, to investigate if the enum library still slows performance.
     """
@@ -215,8 +215,9 @@ class FieldType(enum.StrEnum):
     N = "N"  # "Numeric"  # (int)
 
 
-FIELD_TYPE_ALIASES: dict[str | bytes, FieldType] = {}
+FIELD_TYPE_ALIASES: dict[str | bytes | FieldType, FieldType] = {}
 for c in FieldType:
+    FIELD_TYPE_ALIASES[c] = c
     FIELD_TYPE_ALIASES[c.name.upper()] = c
     FIELD_TYPE_ALIASES[c.name.lower()] = c
     FIELD_TYPE_ALIASES[c.name.encode("ascii").lower()] = c
@@ -589,7 +590,7 @@ class Field(NamedTuple):
             type_ = FIELD_TYPE_ALIASES[field_type]
         except KeyError:
             raise dbfFileException(
-                f"field_type must be in {FieldType.__members__}. Got: {field_type=}. "
+                f"field_type must be in {list(FieldType)}. Got: {field_type=}. "
             )
 
         if type_ is FieldType.D:
@@ -666,7 +667,7 @@ class Field(NamedTuple):
             strict=strict,
         )
 
-        encoded_field_type = self.field_type.encode("ascii")
+        encoded_field_type = self.field_type.name.encode("ascii")
         return self.get_struct().pack(
             encoded_name,
             encoded_field_type,
@@ -675,7 +676,7 @@ class Field(NamedTuple):
         )
 
     def __repr__(self) -> str:
-        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
+        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type.name}, size={self.size}, decimal={self.decimal})'
 
 
 RecordValueNotDate = Union[bool, int, float, str]
@@ -4400,7 +4401,7 @@ class DbfWriter(_HasCheckedWriteableFile):
             # when their Field instance was created and added to self.fields
             str_val: str | None = None
 
-            if fieldType in ("N", "F"):
+            if fieldType is FieldType.N or fieldType is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 if value in MISSING:
                     str_val = "*" * size  # QGIS NULL
@@ -4422,7 +4423,7 @@ class DbfWriter(_HasCheckedWriteableFile):
                     str_val = format(f_val, f".{deci}f")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
-            elif fieldType == "D":
+            elif fieldType is FieldType.D:
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, list) and len(value) == 3:
                     value = date(*value)
@@ -4441,7 +4442,7 @@ class DbfWriter(_HasCheckedWriteableFile):
                         "Date values must be either a datetime.date object, "
                         "a list, a YYYYMMDD string, or a missing value."
                     )
-            elif fieldType == "L":
+            elif fieldType is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value in MISSING:
                     str_val = " "  # missing is set to space
