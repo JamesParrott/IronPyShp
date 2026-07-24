@@ -33,7 +33,6 @@ from types import TracebackType
 from typing import (
     IO,
     Any,
-    Final,
     Generic,
     Literal,
     NamedTuple,
@@ -201,35 +200,27 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, PathLike[Any], IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
-FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
-
 
 # https://en.wikipedia.org/wiki/.dbf#Database_records
-class FieldType:
-    """A bare bones 'enum', as the enum library noticeably slows performance."""
+class FieldType(enum.StrEnum):
+    """Previously A bare bones 'enum'.
+    Restored to an Enum, to investigate if the enum library still slows performance.
+    """
 
-    C: Final = "C"  # "Character"  # (str)
-    D: Final = "D"  # "Date"
-    F: Final = "F"  # "Floating point"
-    L: Final = "L"  # "Logical"  # (bool)
-    M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
-    N: Final = "N"  # "Numeric"  # (int)
-    __members__: set[FieldTypeT] = {
-        "C",
-        "D",
-        "F",
-        "L",
-        "M",
-        "N",
-    }
+    C = "C"  # "Character"  # (str)
+    D = "D"  # "Date"
+    F = "F"  # "Floating point"
+    L = "L"  # "Logical"  # (bool)
+    M = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
+    N = "N"  # "Numeric"  # (int)
 
 
-FIELD_TYPE_ALIASES: dict[str | bytes, FieldTypeT] = {}
-for c in FieldType.__members__:
-    FIELD_TYPE_ALIASES[c.upper()] = c
-    FIELD_TYPE_ALIASES[c.lower()] = c
-    FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
-    FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
+FIELD_TYPE_ALIASES: dict[str | bytes, FieldType] = {}
+for c in FieldType:
+    FIELD_TYPE_ALIASES[c.name.upper()] = c
+    FIELD_TYPE_ALIASES[c.name.lower()] = c
+    FIELD_TYPE_ALIASES[c.name.encode("ascii").lower()] = c
+    FIELD_TYPE_ALIASES[c.name.encode("ascii").upper()] = c
 
 
 class PossibleDataLoss(Warning):
@@ -520,7 +511,7 @@ def _decode_C_or_M_field(
 
 class Field(NamedTuple):
     name: str
-    field_type: FieldTypeT
+    field_type: FieldType
     size: int
     decimal: int
 
@@ -574,7 +565,7 @@ class Field(NamedTuple):
         cls,
         name: str,
         *,
-        field_type: str | bytes | FieldTypeT = "C",
+        field_type: str | bytes | FieldType = "C",
         size: int = 50,
         decimal: int = 0,
         encoding: str = "utf8",
@@ -4282,7 +4273,7 @@ class DbfWriter(_HasCheckedWriteableFile):
         # Types of args should match *Field
         self,
         name: str,
-        field_type: FieldTypeT = "C",
+        field_type: str | bytes | FieldType = FieldType.C,
         size: int = 50,
         decimal: int = 0,
     ) -> None:
@@ -5089,7 +5080,7 @@ class Writer(_HasExitStack):
         # Types of args should match *Field
         self,
         name: str,
-        field_type: FieldTypeT = "C",
+        field_type: str | bytes | FieldType = "C",
         size: int = 50,
         decimal: int = 0,
     ) -> None:
