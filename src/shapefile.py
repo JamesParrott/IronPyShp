@@ -12,6 +12,7 @@ __version__ = "3.1.6.dev"
 
 import abc
 import array
+import enum
 import functools
 import io
 import itertools
@@ -1106,11 +1107,12 @@ class GeoJSON_Error(Exception):
     pass
 
 
-class _NoShapeTypeSentinel:
-    """An instance is the default value for Shape.__init__,
+class _DefaultShapeType(enum.Enum):
+    """Provides the default value for Shape.__init__,
     to preserve old behaviour for anyone who explictly
     called Shape(shapeType=None).
     """
+    unspecified = enum.auto()
 
 
 def _ensure_within_bounds(m: float | None) -> float | None:
@@ -1176,7 +1178,7 @@ class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
 class Shape:
     def __init__(
         self,
-        shapeType: int | _NoShapeTypeSentinel = _NoShapeTypeSentinel(),
+        shapeType: int | _DefaultShapeType = _DefaultShapeType.unspecified,
         points: PointsT | None = None,
         parts: Sequence[int] | None = None,  # index of start point of each part
         lines: list[PointsT] | None = None,
@@ -1207,7 +1209,7 @@ class Shape:
         """
 
         # Preserve previous behaviour for anyone who set self.shapeType = None
-        if isinstance(shapeType, _NoShapeTypeSentinel):
+        if shapeType in _DefaultShapeType:
             class_name = self.__class__.__name__
             self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
         else:
@@ -3572,12 +3574,13 @@ class ShpReader(_HasCheckedReadableFile):
         assert n == len(self.headers_cache), f"{n=}, {len(self.headers_cache)=}"
 
 
-class _NoShpSentinel:
-    """An instance is the default value for shp to preserve the
+class _NoShp(enum.Enum):
+    """Provides the default value for shp to preserve the
     old behaviour (from when all keyword args were gathered
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
+    unspecified=enum.auto()
 
 
 class Reader(_HasExitStack):
@@ -3614,7 +3617,7 @@ class Reader(_HasExitStack):
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: _NoShpSentinel | BinaryFileT | None = _NoShpSentinel(),
+        shp: _NoShp | BinaryFileT | None = _NoShp.unspecified,
         shx: BinaryFileT | None = None,
         dbf: BinaryFileT | None = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
@@ -3639,7 +3642,7 @@ class Reader(_HasExitStack):
                     " (or satisfy os.PathLike). "
                 )
             discarded_kwargs = {}
-            if shp is not None and not isinstance(shp, _NoShpSentinel):
+            if shp is not None and shp not in _NoShp:
                 discarded_kwargs["shp"] = shp
             if shx is not None:
                 discarded_kwargs["shx"] = shx
@@ -3712,7 +3715,7 @@ class Reader(_HasExitStack):
             #
             return
 
-        if not isinstance(shp, _NoShpSentinel):
+        if shp not in _NoShp:
             self._shp = self._seek_0_on_file_obj_wrap_or_open_from_name(".shp", shp)
             self._shx = self._seek_0_on_file_obj_wrap_or_open_from_name(".shx", shx)
 
