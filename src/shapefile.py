@@ -2643,7 +2643,7 @@ class _Record(list[RecordValue]):
         if date_strings:
             for k, v in dct.items():
                 if isinstance(v, date):
-                    dct[k] = f"{v.year:04d}{v.month:02d}{v.day:02d}"
+                    dct[k] = v.strftime("%Y%m%d")
         return dct
 
     def __repr__(self) -> str:
@@ -4429,10 +4429,10 @@ class DbfWriter(_WriterBase):
         size: int = 50,
         decimal: int = 0,
     ) -> None:
-        """Adds a dbf field descriptor to the shapefile."""
+        """Adds a dbf field descriptor to the .dbf file (in its header)."""
         if len(self.fields) >= self.max_num_fields:
             raise dbfFileException(
-                f".dbf Shapefile Writer reached maximum number of fields: {self.max_num_fields}."
+                f".dbf Writer reached maximum number of fields: {self.max_num_fields}."
             )
         field = Field.from_unchecked(
             name=name,
@@ -4548,8 +4548,8 @@ class DbfWriter(_WriterBase):
             self._header()
         # first byte of the record is deletion flag
         # (b" " for not deleted, b"*" for deleted).
-        record_stream.write(b"*" if set_deletion_flag else b" ")
-        # begin
+        deletion_flag = b"*" if set_deletion_flag else b" "
+        record_stream.write(deletion_flag)
 
         for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
             # write
